@@ -5,6 +5,12 @@ from Classes.Series import Series
 from Components.ComicPreprocessor import ComicPreprocessor
 from Components.ComicPdfReader import convert_pdf_to_image
 from Components.SpeechBubbleExtractor import SpeechBubbleExtractor
+import pyttsx3;
+from gtts import gTTS
+import os
+from io import BytesIO
+
+
 
 class FileInputPage:
     def __init__(self, parent):
@@ -48,6 +54,15 @@ class FileInputPage:
         self.next_button = tk.Button(self.frame, text="Next", command=self.handle_next)
         self.next_button.pack(pady=10)
         
+        self.talk_button = tk.Button(self.frame,text="Talk",command=self.talk)
+        self.talk_button.pack(pady=10)
+
+    def talk(self):
+        engine = pyttsx3.init();
+        engine.say("Hello guys today i am talking and how are you all doing this is a story about spiderman");
+        engine.runAndWait() ;
+
+        
     def browse_file(self):
         filename = filedialog.askopenfilename(parent=self.parent.root, title='Browse File')
         if filename:
@@ -71,6 +86,6 @@ class FileInputPage:
         messagebox.showinfo("Info", "The Comic PDF is now being read. This may take a few minutes. Please wait.")
 
         rgb_arrays = convert_pdf_to_image(file_path)
-        self.comic_preprocessor = ComicPreprocessor(rgb_arrays, name, volume, main_series, secondary_series)
+        self.comic_preprocessor = ComicPreprocessor(name, volume, main_series, secondary_series,rgb_arrays)
         self.speech_bubble_extractor = SpeechBubbleExtractor(self.comic_preprocessor.current_comic)
         self.parent.show_comic_display_screen(self.speech_bubble_extractor.current_comic)

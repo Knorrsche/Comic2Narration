@@ -1,16 +1,17 @@
-from pdf2image import convert_from_path
 from PIL import Image
 import numpy as np
-from Classes.Page import Page,PageType
+import fitz
 
 def convert_pdf_to_image(pdf_path: str):
-    images = convert_from_path(pdf_path, poppler_path=r"c:\Users\derra\Downloads\Release-24.02.0-0\poppler-24.02.0\Library\bin")
+    pdf = fitz.open(pdf_path)
 
     rgb_arrays = []
-    for image in images:
-        rgb_image = image.convert('RGB')
-        rgb_array = np.array(rgb_image)
+    for page_number in range(len(pdf)):
+        page = pdf.load_page(page_number)
+        pix = page.get_pixmap()
+        img = Image.frombytes("RGB",[pix.width,pix.height],pix.samples)
+        rgb_array = np.array(img)
         rgb_arrays.append(rgb_array)
-
+     
     return rgb_arrays
 
