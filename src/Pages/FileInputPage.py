@@ -9,6 +9,7 @@ import pyttsx3;
 from gtts import gTTS
 import os
 from io import BytesIO
+import pickle
 
 
 
@@ -54,6 +55,9 @@ class FileInputPage:
         self.next_button = tk.Button(self.frame, text="Next", command=self.handle_next)
         self.next_button.pack(pady=10)
         
+        self.import_button = tk.Button(self.frame,text="Import",command=self.import_comic)
+        self.import_button.pack(pady=10)
+
         self.talk_button = tk.Button(self.frame,text="Talk",command=self.talk)
         self.talk_button.pack(pady=10)
 
@@ -88,4 +92,18 @@ class FileInputPage:
         rgb_arrays = convert_pdf_to_image(file_path)
         self.comic_preprocessor = ComicPreprocessor(name, volume, main_series, secondary_series,rgb_arrays)
         self.speech_bubble_extractor = SpeechBubbleExtractor(self.comic_preprocessor.current_comic)
+        #TODO: Remove this if pdf export works
+        self.save_comic_data('comic.pkl', self.comic_preprocessor.current_comic)
         self.parent.show_comic_display_screen(self.speech_bubble_extractor.current_comic)
+
+    def save_comic_data(self,filename, data):
+        with open(filename, 'wb') as f:
+            pickle.dump(data, f)
+
+    def load_comic_data(self,filename):
+        with open(filename, 'rb') as f:
+            return pickle.load(f)
+
+    #TODO: Implement import if pdf export works
+    def import_comic(self):
+        self.parent.show_comic_display_screen(self.load_comic_data('comic.pkl'))
