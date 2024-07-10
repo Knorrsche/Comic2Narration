@@ -1,6 +1,8 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 import numpy as np
+import Utils.ImageUtils as iu
+from Classes import Page
 
 class ComicDisplayPage:
     def __init__(self, parent, comic):
@@ -42,11 +44,14 @@ class ComicDisplayPage:
         if self.current_page_pair_index < 0 or self.current_page_pair_index >= len(self.comic.page_pairs):
             return
 
-        left_page = self.comic.page_pairs[self.current_page_pair_index][0]
-        right_page = self.comic.page_pairs[self.current_page_pair_index][1]
+        left_page:Page = self.comic.page_pairs[self.current_page_pair_index][0]
+        right_page:Page = self.comic.page_pairs[self.current_page_pair_index][1]
 
         left_image_array = left_page.page_image if left_page is not None else self.create_blank_image()
         right_image_array = right_page.page_image if right_page is not None else self.create_blank_image()
+
+        left_image_array = left_page.annotateted_image() if left_page is not None else left_image_array
+        right_image_array = right_page.annotateted_image() if right_page is not None else right_image_array
 
         self.left_image = Image.fromarray(left_image_array)
         self.right_image = Image.fromarray(right_image_array)

@@ -3,10 +3,11 @@ from Classes.Series import Series
 from Classes.Page import Page,PageType
 from Classes.Panel import Panel
 from typing import Optional, List
-from .ComicPdfReader import convert_pdf_to_image
 from inference_sdk import InferenceHTTPClient
 import threading
 import logging
+from Utils import ImageUtils as iu
+
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -60,17 +61,6 @@ class ComicPreprocessor:
     def describe_image(self):
         return ''
 
-    # TODO: DRY!!! Refactor code -> Used in SpeechBubbleExtractor and ComicDisplayPage
-    def load_panel_image_from_page(self, page, bbox):
-        x = int(bbox['x'] - bbox['width'] / 2)
-        y = int(bbox['y'] - bbox['height'] / 2)
-        w = int(bbox['width'])
-        h = int(bbox['height'])
-
-        panel_image = page.page_image[y:y+h, x:x+w, :]
-        return panel_image
-
-
     #TODO: Refactor with extract_speech_bubbles
     def detect_panels(self):
         threads = []
@@ -102,20 +92,16 @@ class ComicPreprocessor:
         panels = []
             
         for panel_data in result_panels['predictions']:
-    
-            panel_image = self.load_panel_image_from_page(page,panel_data)
+            if panel_data['confidence'] < 0.3:
+                continue
+
+            panel_image = iu.image_from_bbox(page.page_image,panel_data)
    
             description = self.describe_image()
             panel = Panel(description, panel_data,panel_image)
             panels.append(panel)
             
-            # TODO: Sort Panels by position
-            self.link_panels(panels)
-            page.panels = panels
+        # TODO: Sort Panels by position
+        page.panels = panels
     
-    def link_panels(self, panels):
-        for i in range(len(panels)):
-            prev_panel = panels[i-1] if i > 0 else None
-            next_panel = panels[i+1] if i < len(panels)-1 else None
-            panels[i].set_panels(next_panel, prev_panel)
     

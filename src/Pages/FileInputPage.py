@@ -1,14 +1,10 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
-from Classes.Comic import Comic
 from Classes.Series import Series
 from Components.ComicPreprocessor import ComicPreprocessor
-from Components.ComicPdfReader import convert_pdf_to_image
+from Utils.IOUtils import convert_pdf_to_image
 from Components.SpeechBubbleExtractor import SpeechBubbleExtractor
 import pyttsx3;
-from gtts import gTTS
-import os
-from io import BytesIO
 import pickle
 
 
