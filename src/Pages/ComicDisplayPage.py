@@ -3,7 +3,7 @@ import tkinter as tk
 import numpy as np
 from PIL import Image, ImageTk
 
-from src.Classes import Page
+from Classes import Page
 
 
 class ComicDisplayPage:

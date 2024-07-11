@@ -1,8 +1,8 @@
 import tkinter as tk
-from src.Pages.FileInputPage import FileInputPage
-from src.Pages.ComicDisplayPage import ComicDisplayPage
-from src.Components.ComicPreprocessor import ComicPreprocessor
-from src.Components.SpeechBubbleExtractor import SpeechBubbleExtractor
+from Pages.FileInputPage import FileInputPage
+from Pages.ComicDisplayPage import ComicDisplayPage
+from Components.ComicPreprocessor import ComicPreprocessor
+from Components.SpeechBubbleExtractor import SpeechBubbleExtractor
 
 
 class Application:

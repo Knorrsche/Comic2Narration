@@ -1,9 +1,9 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
-from src.Classes.Series import Series
-from src.Components.ComicPreprocessor import ComicPreprocessor
-from src.Utils.IOUtils import convert_pdf_to_image
-from src.Components.SpeechBubbleExtractor import SpeechBubbleExtractor
+from Classes.Series import Series
+from Components.ComicPreprocessor import ComicPreprocessor
+from Utils.IOUtils import convert_pdf_to_image
+from Components.SpeechBubbleExtractor import SpeechBubbleExtractor
 import pyttsx3;
 import pickle
 

@@ -1,11 +1,11 @@
 import logging
 import threading
 from typing import Optional, List
-from src.Classes.Panel import Panel
-from src.Classes.Comic import Comic
-from src.Classes.Page import Page, PageType
-from src.Classes.Series import Series
-from src.Utils import ImageUtils as iu
+from Classes.Panel import Panel
+from Classes.Comic import Comic
+from Classes.Page import Page, PageType
+from Classes.Series import Series
+from Utils import ImageUtils as iu
 from inference_sdk import InferenceHTTPClient
 
 logging.basicConfig(

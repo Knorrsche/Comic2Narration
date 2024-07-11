@@ -1,12 +1,12 @@
-from src.Classes.Comic import Comic
-from src.Classes.SpeechBubble import SpeechBubble,SpeechBubbleType
-from src.Classes.Page import Page
+from Classes.Comic import Comic
+from Classes.SpeechBubble import SpeechBubble,SpeechBubbleType
+from Classes.Page import Page
 from PIL import Image
 from inference_sdk import InferenceHTTPClient
 import numpy as np
 import threading
 import logging
-from src.Utils import ImageUtils as iu
+from Utils import ImageUtils as iu
 
 logging.basicConfig(
     level=logging.DEBUG,
