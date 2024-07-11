@@ -1,13 +1,12 @@
-from Classes.Comic import Comic
-from Classes.Series import Series
-from Classes.Page import Page,PageType
-from Classes.Panel import Panel
-from typing import Optional, List
-from inference_sdk import InferenceHTTPClient
-import threading
 import logging
-from Utils import ImageUtils as iu
-
+import threading
+from typing import Optional, List
+from src.Classes.Panel import Panel
+from src.Classes.Comic import Comic
+from src.Classes.Page import Page, PageType
+from src.Classes.Series import Series
+from src.Utils import ImageUtils as iu
+from inference_sdk import InferenceHTTPClient
 
 logging.basicConfig(
     level=logging.DEBUG,

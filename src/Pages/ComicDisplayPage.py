@@ -1,8 +1,10 @@
 import tkinter as tk
-from PIL import Image, ImageTk
+
 import numpy as np
-import Utils.ImageUtils as iu
-from Classes import Page
+from PIL import Image, ImageTk
+
+from src.Classes import Page
+
 
 class ComicDisplayPage:
     def __init__(self, parent, comic):

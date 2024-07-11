@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List
 from .Panel import Panel
-from Utils import ImageUtils as iu
+from src.Utils import ImageUtils as iu
 
 class PageType(Enum):
     INDEX = 1
