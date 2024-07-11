@@ -58,9 +58,9 @@ class SpeechBubbleExtractor:
             if speech_bubble_data['confidence'] < 0.3:
                 continue
             description = self.ocr_text()
-            speech_bubble_type = self.classify_speech_bubble()
+            speech_bubble_type:SpeechBubbleType = self.classify_speech_bubble()
             speech_bubble_image = iu.image_from_bbox(page_image,speech_bubble_data)
-            speech_bubble = SpeechBubble(description, speech_bubble_type,speech_bubble_data,speech_bubble_image)
+            speech_bubble = SpeechBubble(speech_bubble_type,description,speech_bubble_data,speech_bubble_image)
             
             for panel in page.panels:
                 if iu.is_bbox_overlapping(speech_bubble.bounding_box,panel.bounding_box,):

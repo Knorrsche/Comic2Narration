@@ -90,7 +90,7 @@ class FileInputPage:
         self.speech_bubble_extractor = SpeechBubbleExtractor(self.comic_preprocessor.current_comic)
         #TODO: Remove this if pdf export works
         self.save_comic_data('comic.pkl', self.comic_preprocessor.current_comic)
-        self.parent.show_comic_display_screen(self.speech_bubble_extractor.current_comic)
+        self.parent.show_comic_display_screen(self.speech_bubble_extractor.current_comic,file_path)
 
     def save_comic_data(self,filename, data):
         with open(filename, 'wb') as f:

@@ -2,7 +2,7 @@
 ### 1. (optional) Set up a virtual environment
 ```bash
 virtualenv .venv
-source .venv/bin/activat
+source .venv/bin/activate
 ```
 ### 2. Install the required packages
 ```bash

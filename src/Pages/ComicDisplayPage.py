@@ -1,18 +1,25 @@
 import tkinter as tk
-
+from tkinter import filedialog, messagebox
 import numpy as np
 from PIL import Image, ImageTk
-
 from Classes import Page
+from Utils import IOUtils as io
 
 
 class ComicDisplayPage:
-    def __init__(self, parent, comic):
+    def __init__(self, parent, comic, filepath):
         self.parent = parent
         self.comic = comic
         self.current_page_pair_index = 0
         self.last_window_height = self.parent.root.winfo_height()
         self.last_window_width = self.parent.root.winfo_width()
+        self.show_speech_bubbles = True
+        self.show_panels = True
+        self.import_path = filepath
+
+        self.menu = tk.Menu(self.parent.root)
+        self.parent.root.config(menu=self.menu)
+        self.create_menu()
 
         self.frame_left = tk.Frame(self.parent.root)
         self.frame_left.pack(side='left', expand=True, fill='both')
@@ -42,6 +49,25 @@ class ComicDisplayPage:
 
         self.display_images()
 
+
+    def create_menu(self):
+        file_menu = tk.Menu(self.menu, tearoff=0)
+        self.menu.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Open", command=self.open_comic)
+        file_menu.add_command(label="Save", command=self.save_comic)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.parent.root.quit)
+
+        export_menu = tk.Menu(self.menu,tearoff=0)
+        self.menu.add_cascade(label="Export",menu=export_menu)
+        export_menu.add_command(label="Export XML",command=self.export_as_xml)
+        export_menu.add_command(label="Export Annotated PDF",command=self.export_as_annotated_pdf)
+
+        display_menu = tk.Menu(self.menu, tearoff=0)
+        self.menu.add_cascade(label="Display", menu=display_menu)
+        display_menu.add_command(label="Toggle Panels", command=self.toggle_panels)
+        display_menu.add_command(label="Toggle Speech Bubbles", command=self.toggle_speech_bubbles)
+
     def display_images(self):
         if self.current_page_pair_index < 0 or self.current_page_pair_index >= len(self.comic.page_pairs):
             return
@@ -49,11 +75,8 @@ class ComicDisplayPage:
         left_page:Page = self.comic.page_pairs[self.current_page_pair_index][0]
         right_page:Page = self.comic.page_pairs[self.current_page_pair_index][1]
 
-        left_image_array = left_page.page_image if left_page is not None else self.create_blank_image()
-        right_image_array = right_page.page_image if right_page is not None else self.create_blank_image()
-
-        left_image_array = left_page.annotateted_image() if left_page is not None else left_image_array
-        right_image_array = right_page.annotateted_image() if right_page is not None else right_image_array
+        left_image_array = left_page.annotateted_image(self.show_panels,self.show_speech_bubbles) if left_page is not None else self.create_blank_image()
+        right_image_array = right_page.annotateted_image(self.show_panels,self.show_speech_bubbles) if right_page is not None else self.create_blank_image()
 
         self.left_image = Image.fromarray(left_image_array)
         self.right_image = Image.fromarray(right_image_array)
@@ -111,3 +134,46 @@ class ComicDisplayPage:
         if self.current_page_pair_index < len(self.comic.page_pairs) - 1:
             self.current_page_pair_index += 1
             self.display_images()
+
+    def toggle_panels(self):
+        self.show_panels = not self.show_panels
+        self.display_images()
+
+    def toggle_speech_bubbles(self):
+        self.show_speech_bubbles= not self.show_speech_bubbles
+        self.display_images()
+
+    def export_as_xml(self):
+        export_path = filedialog.asksaveasfilename(defaultextension=".xml",
+                                                       filetypes=[("XML Files", "*.xml")],
+                                                       title="Select where to save the XML")
+        if export_path:
+            xml = self.comic.to_xml()
+            xml_str = io.prettify_xml(xml)
+            io.save_xml_to_file(export_path, xml_str)
+
+            messagebox.showinfo("Export Successfull", "The XML was exported successfully")
+        else:
+            messagebox.showerror("Error", "Error while trying to export, please try again")
+
+    def export_as_annotated_pdf(self):
+        export_path = filedialog.asksaveasfilename(defaultextension=".pdf",
+                                                       filetypes=[("PDF files", "*.pdf")],
+                                                       title="Select where to save the annotated PDF")
+        
+        if export_path:
+            xml = self.comic.to_xml()
+            xml_str = io.prettify_xml(xml)
+            io.add_annotation_to_pdf(self.import_path, xml_str,export_path)
+            
+            messagebox.showinfo("Export Successfull", "The annotated PDF was exported successfully")
+        else:
+            messagebox.showerror("Error", "Error while trying to export, please try again")
+
+    #TODO: Add load comic
+    def open_comic(self):
+        pass
+
+    #TODO: Add save comic
+    def save_comic(self):
+        pass
