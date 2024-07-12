@@ -2,7 +2,6 @@ import tkinter as tk
 from Pages.FileInputPage import FileInputPage
 from Pages.ComicDisplayPage import ComicDisplayPage
 from Components.ComicPreprocessor import ComicPreprocessor
-from Components.SpeechBubbleExtractor import SpeechBubbleExtractor
 
 
 class Application:
@@ -10,8 +9,6 @@ class Application:
         self.root = root
         self.root.title('Comic Reader')
         self.root.geometry("800x600")
-        self.comic_preprocessor: ComicPreprocessor = None
-        self.speech_bubble_extractor: SpeechBubbleExtractor = None
 
         self.file_input_screen = FileInputPage(self)
         self.comic_display_screen = None
@@ -24,14 +21,14 @@ class Application:
 
         self.file_input_screen.frame.pack(padx=20, pady=20)
 
-    def show_comic_display_screen(self, comic_preprocessor: ComicPreprocessor,filepath:str):
+    def show_comic_display_screen(self, comic_preprocessor: ComicPreprocessor, filepath: str):
         self.file_input_screen.frame.pack_forget()
-        self.comic_display_screen = ComicDisplayPage(self, comic_preprocessor,filepath)
+        self.comic_display_screen = ComicDisplayPage(self, comic_preprocessor, filepath)
 
 
 def main():
     root = tk.Tk()
-    app = Application(root)
+    Application(root)
     root.mainloop()
 
 

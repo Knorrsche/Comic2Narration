@@ -75,8 +75,8 @@ class ComicDisplayPage:
         left_page:Page = self.comic.page_pairs[self.current_page_pair_index][0]
         right_page:Page = self.comic.page_pairs[self.current_page_pair_index][1]
 
-        left_image_array = left_page.annotateted_image(self.show_panels,self.show_speech_bubbles) if left_page is not None else self.create_blank_image()
-        right_image_array = right_page.annotateted_image(self.show_panels,self.show_speech_bubbles) if right_page is not None else self.create_blank_image()
+        left_image_array = left_page.annotated_image(self.show_panels, self.show_speech_bubbles) if left_page is not None else self.create_blank_image()
+        right_image_array = right_page.annotated_image(self.show_panels, self.show_speech_bubbles) if right_page is not None else self.create_blank_image()
 
         self.left_image = Image.fromarray(left_image_array)
         self.right_image = Image.fromarray(right_image_array)
