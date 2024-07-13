@@ -2,10 +2,9 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from Classes.Series import Series
 from Components.ComicPreprocessor import ComicPreprocessor
-from Utils.IOUtils import convert_pdf_to_image
+from Utils.IOUtils import convert_pdf_to_image,parse_comic,read_xml_from_pdf,add_image_data
 from Components.SpeechBubbleExtractor import SpeechBubbleExtractor
 import pyttsx3
-import pickle
 
 
 class FileInputPage:
@@ -65,12 +64,12 @@ class FileInputPage:
         engine.runAndWait()
 
     def browse_file(self):
-        filename = filedialog.askopenfilename(parent=self.parent.root, title='Browse File')
+        filename = filedialog.askopenfilename(parent=self.parent.root, title='Browse File',
+                                              filetypes=(("PDF files", "*.pdf"), ("All files", "*.*")))
         if filename:
             self.file_path = filename
             self.file_entry.delete(0, tk.END)
             self.file_entry.insert(0, filename)
-            print(f"Selected file: {filename}")
 
     def handle_next(self):
         file_path = self.file_entry.get()
@@ -88,20 +87,17 @@ class FileInputPage:
         rgb_arrays = convert_pdf_to_image(file_path)
         self.comic_preprocessor = ComicPreprocessor(name, volume, main_series, secondary_series, rgb_arrays)
         self.speech_bubble_extractor = SpeechBubbleExtractor(self.comic_preprocessor.current_comic)
-        # TODO: Remove this if pdf export works
-        self.save_comic_data('comic.pkl', self.comic_preprocessor.current_comic)
         self.parent.show_comic_display_screen(self.speech_bubble_extractor.current_comic, file_path)
 
-    @staticmethod
-    def save_comic_data(filename, data):
-        with open(filename, 'wb') as f:
-            pickle.dump(data, f)
-
-    @staticmethod
-    def load_comic_data(filename):
-        with open(filename, 'rb') as f:
-            return pickle.load(f)
-
-    # TODO: Implement import if pdf export works
     def import_comic(self):
-        self.parent.show_comic_display_screen(self.load_comic_data('comic.pkl'))
+        self.browse_file()
+        if self.file_path:
+            try:
+                embedded_xml = read_xml_from_pdf(self.file_path)
+                imported_comic = parse_comic(embedded_xml)
+                add_image_data(imported_comic,self.file_path)
+                self.parent.show_comic_display_screen(imported_comic,self.file_path)
+            except Exception as e:
+                e.with_traceback()
+                print(e)
+                messagebox.showerror("Error", f"Failed to import XML file: {e}")

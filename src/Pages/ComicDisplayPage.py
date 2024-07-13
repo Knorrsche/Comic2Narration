@@ -23,11 +23,9 @@ class ComicDisplayPage:
 
         self.frame_left = tk.Frame(self.parent.root)
         self.frame_left.pack(side='left', expand=True, fill='both')
-        
 
         self.frame_right = tk.Frame(self.parent.root)
         self.frame_right.pack(side='right', expand=True, fill='both')
-
 
         self.label_left = tk.Label(self.frame_left)
         self.label_left.pack(expand=True, fill='both')
@@ -44,11 +42,10 @@ class ComicDisplayPage:
         self.resize_delay = 10  # milliseconds
 
         self.parent.root.bind('<Configure>', self.on_window_resize)
-        self.parent.root.bind('<Left>',self.show_previous_page_pair)
-        self.parent.root.bind('<Right>',self.show_next_page_pair)
+        self.parent.root.bind('<Left>', self.show_previous_page_pair)
+        self.parent.root.bind('<Right>', self.show_next_page_pair)
 
         self.display_images()
-
 
     def create_menu(self):
         file_menu = tk.Menu(self.menu, tearoff=0)
@@ -58,10 +55,10 @@ class ComicDisplayPage:
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.parent.root.quit)
 
-        export_menu = tk.Menu(self.menu,tearoff=0)
-        self.menu.add_cascade(label="Export",menu=export_menu)
-        export_menu.add_command(label="Export XML",command=self.export_as_xml)
-        export_menu.add_command(label="Export Annotated PDF",command=self.export_as_annotated_pdf)
+        export_menu = tk.Menu(self.menu, tearoff=0)
+        self.menu.add_cascade(label="Export", menu=export_menu)
+        export_menu.add_command(label="Export XML", command=self.export_as_xml)
+        export_menu.add_command(label="Export Annotated PDF", command=self.export_as_annotated_pdf)
 
         display_menu = tk.Menu(self.menu, tearoff=0)
         self.menu.add_cascade(label="Display", menu=display_menu)
@@ -72,11 +69,13 @@ class ComicDisplayPage:
         if self.current_page_pair_index < 0 or self.current_page_pair_index >= len(self.comic.page_pairs):
             return
 
-        left_page:Page = self.comic.page_pairs[self.current_page_pair_index][0]
-        right_page:Page = self.comic.page_pairs[self.current_page_pair_index][1]
+        left_page: Page = self.comic.page_pairs[self.current_page_pair_index][0]
+        right_page: Page = self.comic.page_pairs[self.current_page_pair_index][1]
 
-        left_image_array = left_page.annotated_image(self.show_panels, self.show_speech_bubbles) if left_page is not None else self.create_blank_image()
-        right_image_array = right_page.annotated_image(self.show_panels, self.show_speech_bubbles) if right_page is not None else self.create_blank_image()
+        left_image_array = left_page.annotated_image(self.show_panels,
+                                                     self.show_speech_bubbles) if left_page is not None else self.create_blank_image()
+        right_image_array = right_page.annotated_image(self.show_panels,
+                                                       self.show_speech_bubbles) if right_page is not None else self.create_blank_image()
 
         self.left_image = Image.fromarray(left_image_array)
         self.right_image = Image.fromarray(right_image_array)
@@ -113,7 +112,7 @@ class ComicDisplayPage:
     def on_window_resize(self, event):
         if event.width == self.last_window_width and event.height == self.last_window_height:
             return
-        
+
         if event.widget == self.parent.root:
             if self.resize_pending:
                 self.parent.root.after_cancel(self.resize_pending)
@@ -125,12 +124,12 @@ class ComicDisplayPage:
         self.resize_and_update_images()
         self.resize_pending = None
 
-    def show_previous_page_pair(self,event):
+    def show_previous_page_pair(self, event):
         if self.current_page_pair_index > 0:
             self.current_page_pair_index -= 1
             self.display_images()
 
-    def show_next_page_pair(self,event):
+    def show_next_page_pair(self, event):
         if self.current_page_pair_index < len(self.comic.page_pairs) - 1:
             self.current_page_pair_index += 1
             self.display_images()
@@ -140,13 +139,13 @@ class ComicDisplayPage:
         self.display_images()
 
     def toggle_speech_bubbles(self):
-        self.show_speech_bubbles= not self.show_speech_bubbles
+        self.show_speech_bubbles = not self.show_speech_bubbles
         self.display_images()
 
     def export_as_xml(self):
         export_path = filedialog.asksaveasfilename(defaultextension=".xml",
-                                                       filetypes=[("XML Files", "*.xml")],
-                                                       title="Select where to save the XML")
+                                                   filetypes=[("XML Files", "*.xml")],
+                                                   title="Select where to save the XML")
         if export_path:
             xml = self.comic.to_xml()
             xml_str = io.prettify_xml(xml)
@@ -158,15 +157,15 @@ class ComicDisplayPage:
 
     def export_as_annotated_pdf(self):
         export_path = filedialog.asksaveasfilename(defaultextension=".pdf",
-                                                       filetypes=[("PDF files", "*.pdf")],
-                                                       title="Select where to save the annotated PDF")
-        
+                                                   filetypes=[("PDF files", "*.pdf")],
+                                                   title="Select where to save the annotated PDF")
+
         if export_path:
             xml = self.comic.to_xml()
             xml_str = io.prettify_xml(xml)
             io.add_annotation_to_pdf(self.import_path, xml_str,export_path)
-            
-            messagebox.showinfo("Export Successfull", "The annotated PDF was exported successfully")
+
+            messagebox.showinfo("Export Successfully", "The annotated PDF was exported successfully")
         else:
             messagebox.showerror("Error", "Error while trying to export, please try again")
 
@@ -174,6 +173,6 @@ class ComicDisplayPage:
     def open_comic(self):
         pass
 
-    #TODO: Add save comic
+    # TODO: Add save comic
     def save_comic(self):
         pass

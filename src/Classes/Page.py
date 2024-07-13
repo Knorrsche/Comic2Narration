@@ -29,6 +29,12 @@ class Page:
         self.width = width
         self.panels = panels if panels else []
 
+    def __init__(self, page_index: int, page_type: PageType,
+                     panels: List[Panel]):
+            self.page_index = page_index
+            self.page_type = page_type
+            self.panels = panels if panels else []
+
     def annotated_image(self, draw_panels: bool, draw_speech_bubbles: bool):
         new_image = self.page_image.copy()
 

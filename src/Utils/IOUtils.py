@@ -3,8 +3,11 @@ import numpy as np
 import fitz
 import xml.etree.ElementTree as eT
 from xml.dom import minidom
-import os
 import pathlib
+import tempfile
+
+from src.Classes import PageType, SpeechBubbleType, Series, Comic, Page, Panel, Entity, EntityTemplate, SpeechBubble
+from src.Utils.ImageUtils import image_from_bbox
 
 
 def convert_pdf_to_image(pdf_path: str):
@@ -31,60 +34,127 @@ def save_xml_to_file(filepath, xml_str):
     with open(filepath, 'w') as file:
         file.write(xml_str)
 
-#TODO: make a better annotation method and format
-def add_annotation_to_pdf(import_path,xml_str,export_path):
-    doc = fitz.open(import_path)
 
-    first_page = doc[0]  
-    rect = fitz.Rect(100, 100, 200, 120)
-    annot = first_page.add_text_annot(rect, "XML")
-    
-    annot.set_info(xml_str)
-    annot.update()
+def read_xml_from_pdf(pdf_path: str):
+    doc = fitz.open(pdf_path)
 
-    doc.save(export_path)
-    doc.close()
+    if doc.embfile_count() <= 0:
+        raise Exception("No embedded XML found")
 
-path = r"C:\Users\derra\Desktop\Bachelor"
+    return doc.embfile_get(0)
 
-namedoc = "Spiderman.pdf"
 
-pathnamedoc = os.path.join(path, namedoc)
+# TODO: Add error handling if embedding already exists
+def add_annotation_to_pdf(pdf_path: str, xml_content: str, new_pdf_path: str):
+    doc = fitz.open(pdf_path)
 
-doc = fitz.open(pathnamedoc)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".xml") as temp_xml_file:
+        temp_xml_file.write(xml_content.encode('utf-8'))
+        temp_xml_file_path = temp_xml_file.name
 
-count = doc.embfile_count()
-print("Number of embedded files before:", count)
+    try:
+        embedded_data = pathlib.Path(temp_xml_file_path).read_bytes()
 
-namedata = "Spiderman.xml"
-pathnamedata = os.path.join(path, namedata)
-print("Path to XML file:", pathnamedata)
-embedded_data = pathlib.Path(pathnamedata).read_bytes()
-doc.embfile_add("Spiderman.xml", embedded_data)
+        doc.embfile_add(name="comic_data.xml", buffer_=embedded_data)
 
-namemp3 = "Spiderman.mp3"
-pathnamemp3 = os.path.join(path, namemp3)
-print("Path to MP3 file:", pathnamemp3)
-embedded_mp3 = pathlib.Path(pathnamemp3).read_bytes()
-doc.embfile_add("Spiderman.mp3", embedded_mp3)
+        doc.save(new_pdf_path)
+    finally:
+        doc.close()
+        pathlib.Path(temp_xml_file_path).unlink()
 
-doc.saveIncr()
 
-doc.close()
+def parse_bounding_box(bbox_str):
+    parts = bbox_str.split(',')
 
-doc = fitz.open(pathnamedoc)
+    bbox_dict = {}
 
-count = doc.embfile_count()
-print("Number of embedded files after:", count)
+    for part in parts:
+        key_value_pair = part.split(':')
+        key = key_value_pair[0]
+        value = ':'.join(key_value_pair[1:])
+        if key in ['x', 'y', 'width', 'height', 'confidence']:
+            bbox_dict[key] = float(value)
+        else:
+            bbox_dict[key] = value
 
-embedded_file_xml = doc.embfile_get(0)
-if embedded_file_xml is not None:
-    with open(os.path.join(path, "extracted_data.xml"), "wb") as f:
-        f.write(embedded_file_xml)
+    return bbox_dict
 
-embedded_file_mp3 = doc.embfile_get(1)
-if embedded_file_mp3 is not None:
-    with open(os.path.join(path, "extracted_audio.mp3"), "wb") as f:
-        f.write(embedded_file_mp3)
 
-doc.close()
+def parse_speech_bubble(sb_elem):
+    return SpeechBubble(
+        type=SpeechBubbleType[sb_elem.find('Type').text.upper()],
+        text=sb_elem.find('Text').text,
+        bounding_box=parse_bounding_box(sb_elem.find('BoundingBox').text)
+    )
+
+
+def parse_panel(panel_elem):
+    speech_bubbles = [parse_speech_bubble(sb) for sb in panel_elem.find('SpeechBubbles')]
+    return Panel(
+        description=panel_elem.find('Description').text,
+        bounding_box=parse_bounding_box(panel_elem.find('BoundingBox').text),
+        speech_bubbles=speech_bubbles
+    )
+
+
+def parse_page(page_elem):
+    panels = [parse_panel(panel) for panel in page_elem.find('Panels')]
+    return Page(
+        page_index=int(page_elem.find('Index').text),
+        page_type=PageType[page_elem.find('Type').text.upper()],
+        panels=panels
+    )
+
+
+def parse_page_pair(page_pair_elem):
+    right_page = parse_page(page_pair_elem.find('RightPage/Page')) if page_pair_elem.find('RightPage') else None
+    left_page = parse_page(page_pair_elem.find('LeftPage/Page')) if page_pair_elem.find('LeftPage') else None
+    return left_page, right_page
+
+
+def parse_series(series_elem):
+    name_elem = series_elem.find('Name')
+    if name_elem is not None:
+        return Series(name=name_elem.text)
+    else:
+        return Series(name='')
+
+
+# TODO: add image data
+def parse_comic(xml_content):
+    root = eT.fromstring(xml_content)
+    name = root.find('Name').text
+    volume = root.find('Volume').text
+    main_series = parse_series(root.find('MainSeries'))
+    secondary_series = [parse_series(series) for series in root.find('SecondarySeries')]
+    page_pairs = [parse_page_pair(pp) for pp in root.find('PagePairs')]
+
+    return Comic(name, volume, main_series, secondary_series, page_pairs)
+
+
+def add_image_data(comic: Comic, file_path: str):
+
+    pages = convert_pdf_to_image(file_path)
+    counter = 0
+    for page_pair in comic.page_pairs:
+
+        left_page, right_page = page_pair
+
+        if left_page is not None:
+            left_page.page_image = pages[counter]
+            for panel in left_page.panels:
+
+                panel.image = image_from_bbox(left_page.page_image,panel.bounding_box)
+
+                for speech_bubble in panel.speech_bubbles:
+                    speech_bubble.image = image_from_bbox(left_page.page_image,speech_bubble.bounding_box)
+            counter += 1
+
+        if right_page is not None:
+            right_page.page_image = pages[counter]
+            for panel in right_page.panels:
+                panel.image = image_from_bbox( right_page.page_image, panel.bounding_box)
+
+                for speech_bubble in panel.speech_bubbles:
+                    speech_bubble.image = image_from_bbox( right_page.page_image, speech_bubble.bounding_box)
+            counter += 1
