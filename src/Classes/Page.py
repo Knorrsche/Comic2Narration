@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List
+from typing import List,Optional
 from .Panel import Panel
 from Utils import ImageUtils as iU
 import xml.etree.ElementTree as eT
@@ -19,21 +19,17 @@ class Page:
     bbox_color_speech_bubble = (255, 0, 0)
     bbox_thickness_speech_bubble = 2
 
-    # TODO: refactor height and width out
-    def __init__(self, page_image: List[List[int]], page_index: int, page_type: PageType, height: float, width: float,
-                 panels: List[Panel]):
-        self.page_image = page_image
-        self.page_index = page_index
-        self.page_type = page_type
-        self.height = height
-        self.width = width
-        self.panels = panels if panels else []
-
+    # TODO: refactor height and width ou
     def __init__(self, page_index: int, page_type: PageType,
-                     panels: List[Panel]):
+                     panels: Optional[List[Panel]] = None,
+                     page_image= None,
+                     height: Optional[float] = None, width: Optional[float] = None):
             self.page_index = page_index
             self.page_type = page_type
             self.panels = panels if panels else []
+            self.page_image = page_image
+            self.height = height
+            self.width = width
 
     def annotated_image(self, draw_panels: bool, draw_speech_bubbles: bool):
         new_image = self.page_image.copy()

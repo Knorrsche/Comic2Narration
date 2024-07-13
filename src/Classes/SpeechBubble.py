@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List
+from typing import List,Optional
 from .Entity import Entity
 import xml.etree.ElementTree as ET
 
@@ -14,18 +14,11 @@ class SpeechBubbleType(Enum):
 
 class SpeechBubble:
 
-    def __init__(self, type: SpeechBubbleType, text: str, bounding_box, image):
+    def __init__(self, type: SpeechBubbleType, text: str, bounding_box, image = None):
         self.type: SpeechBubbleType = type
         self.text = text
         self.bounding_box = bounding_box
         self.image = image
-        self.speaker: List[Entity] = []
-
-    # TODO: remove if image data added to import
-    def __init__(self, type: SpeechBubbleType, text: str, bounding_box):
-        self.type: SpeechBubbleType = type
-        self.text = text
-        self.bounding_box = bounding_box
         self.speaker: List[Entity] = []
 
     def set_speaker(self, speaker: List[Entity]):

@@ -30,6 +30,7 @@ class ComicPreprocessor:
                                 secondary_series: Optional[List[Series]], page_pairs):
         return Comic(name, volume, main_series, secondary_series, page_pairs)
 
+    # TODO: refactor loop and use counter
     def convert_array_to_page_pairs(self, rgb_arrays):
         page_pairs = []
         i = 0
@@ -39,14 +40,14 @@ class ComicPreprocessor:
 
             if i == 0:
                 first_page = None
-                second_page = Page(rgb_array, i, self.classify_page(), height, width, [])
+                second_page = Page(page_image=rgb_array, page_index=i, page_type=self.classify_page(), height=height, width=width)
             else:
-                first_page = Page(rgb_array, i, self.classify_page(), height, width, [])
+                first_page = Page(page_image=rgb_array, page_index=i, page_type=self.classify_page(), height=height, width=width)
 
                 if i + 1 < len(rgb_arrays):
                     rgb_array_next = rgb_arrays[i + 1]
                     height_next, width_next, _ = rgb_array_next.shape
-                    second_page = Page(rgb_array_next, i + 1, self.classify_page(), height_next, width_next, [])
+                    second_page = Page(page_image=rgb_array_next, page_index=i + 1, page_type=self.classify_page(), height=height_next, width=width_next)
                     i += 1
                 else:
                     second_page = None
