@@ -5,6 +5,9 @@ import xml.etree.ElementTree as eT
 from xml.dom import minidom
 import pathlib
 import tempfile
+import pyttsx3
+from gtts import gTTS
+import os
 
 from src.Classes import PageType, SpeechBubbleType, Series, Comic, Page, Panel, Entity, EntityTemplate, SpeechBubble
 from src.Utils.ImageUtils import image_from_bbox
@@ -30,10 +33,26 @@ def prettify_xml(element):
     return reparsed.toprettyxml(indent="  ")
 
 
+# TODO: make universal export and import functions
 def save_xml_to_file(filepath, xml_str):
     with open(filepath, 'w') as file:
         file.write(xml_str)
 
+# TODO: currently, the text is only getting processed after export to xml, add process before
+def save_script_as_txt(filepath, script):
+    with open(filepath, 'w') as file:
+        file.write(script)
+
+
+def save_script_as_mp3(filepath, script):
+    #tts = gTTS(text=script, lang='en')
+    #tts.save(filepath)
+    engine = pyttsx3.init()
+    voices = engine.getProperty('voices')
+    engine.setProperty('voice',voices[1].id )
+    engine.save_to_file(script, filepath)
+    engine.runAndWait()
+    print(f'Created MP3 file: {filepath}')
 
 def read_xml_from_pdf(pdf_path: str):
     doc = fitz.open(pdf_path)
@@ -133,7 +152,6 @@ def parse_comic(xml_content):
 
 
 def add_image_data(comic: Comic, file_path: str):
-
     pages = convert_pdf_to_image(file_path)
     counter = 0
     for page_pair in comic.page_pairs:
@@ -144,17 +162,17 @@ def add_image_data(comic: Comic, file_path: str):
             left_page.page_image = pages[counter]
             for panel in left_page.panels:
 
-                panel.image = image_from_bbox(left_page.page_image,panel.bounding_box)
+                panel.image = image_from_bbox(left_page.page_image, panel.bounding_box)
 
                 for speech_bubble in panel.speech_bubbles:
-                    speech_bubble.image = image_from_bbox(left_page.page_image,speech_bubble.bounding_box)
+                    speech_bubble.image = image_from_bbox(left_page.page_image, speech_bubble.bounding_box)
             counter += 1
 
         if right_page is not None:
             right_page.page_image = pages[counter]
             for panel in right_page.panels:
-                panel.image = image_from_bbox( right_page.page_image, panel.bounding_box)
+                panel.image = image_from_bbox(right_page.page_image, panel.bounding_box)
 
                 for speech_bubble in panel.speech_bubbles:
-                    speech_bubble.image = image_from_bbox( right_page.page_image, speech_bubble.bounding_box)
+                    speech_bubble.image = image_from_bbox(right_page.page_image, speech_bubble.bounding_box)
             counter += 1

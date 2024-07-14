@@ -13,6 +13,28 @@ class Comic:
         self.secondary_series = secondary_series
         self.page_pairs = page_pairs
 
+    def to_narrative(self) -> str:
+        script = ''
+        white_spaces = '     '
+
+        for page_pair in self.page_pairs:
+
+            for page in page_pair:
+                if page is None:
+                    continue
+                script += f'\nPage: {page.page_index}\n'
+                panel_counter = 1
+
+                for panel in page.panels:
+                    script += f'\n{white_spaces}Panel {panel_counter}: {panel.description}\n'
+                    panel_counter += 1
+                    speech_bubble_counter = 1
+
+                    for speech_bubble in panel.speech_bubbles:
+                        script += f'\n{white_spaces * 2}Speech Bubble {speech_bubble_counter}: {speech_bubble.text}\n'
+                        speech_bubble_counter += 1
+        return script
+
     # TODO: create series object
     def to_xml(self):
         element = eT.Element('Comic')

@@ -59,6 +59,8 @@ class ComicDisplayPage:
         self.menu.add_cascade(label="Export", menu=export_menu)
         export_menu.add_command(label="Export XML", command=self.export_as_xml)
         export_menu.add_command(label="Export Annotated PDF", command=self.export_as_annotated_pdf)
+        export_menu.add_command(label="Export Script",command=self.export_as_script)
+        export_menu.add_command(label="Export MP3",command=self.export_as_mp3)
 
         display_menu = tk.Menu(self.menu, tearoff=0)
         self.menu.add_cascade(label="Display", menu=display_menu)
@@ -155,6 +157,7 @@ class ComicDisplayPage:
         else:
             messagebox.showerror("Error", "Error while trying to export, please try again")
 
+    # TODO: make universal export function
     def export_as_annotated_pdf(self):
         export_path = filedialog.asksaveasfilename(defaultextension=".pdf",
                                                    filetypes=[("PDF files", "*.pdf")],
@@ -166,6 +169,30 @@ class ComicDisplayPage:
             io.add_annotation_to_pdf(self.import_path, xml_str,export_path)
 
             messagebox.showinfo("Export Successfully", "The annotated PDF was exported successfully")
+        else:
+            messagebox.showerror("Error", "Error while trying to export, please try again")
+
+    def export_as_script(self):
+        export_path = filedialog.asksaveasfilename(defaultextension=".txt",
+                                                   filetypes=[("Text files", "*.txt")],
+                                                   title="Select where to save the Script")
+
+        if export_path:
+            io.save_script_as_txt(export_path,self.comic.to_narrative())
+
+            messagebox.showinfo("Export Successfully", "The Script was exported successfully")
+        else:
+            messagebox.showerror("Error", "Error while trying to export, please try again")
+
+    def export_as_mp3(self):
+        export_path = filedialog.asksaveasfilename(defaultextension=".mp3",
+                                                   filetypes=[("MP3 files", "*.mp3")],
+                                                   title="Select where to save the MP3")
+
+        if export_path:
+            io.save_script_as_mp3(export_path,self.comic.to_narrative())
+
+            messagebox.showinfo("Export Successfully", "The MP3 was exported successfully")
         else:
             messagebox.showerror("Error", "Error while trying to export, please try again")
 

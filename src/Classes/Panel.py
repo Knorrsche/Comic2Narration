@@ -1,10 +1,11 @@
-from typing import Tuple,List
+from typing import Tuple, List
 from .Entity import Entity
 from .SpeechBubble import SpeechBubble
-import xml.etree.ElementTree as ET 
+import xml.etree.ElementTree as ET
+
 
 class Panel:
-    def __init__(self,description: str, bounding_box,image = None,speech_bubbles = None):
+    def __init__(self, description: str, bounding_box, image=None, speech_bubbles=None):
         self.description = description
         self.bounding_box = bounding_box
         self.image = image
@@ -14,7 +15,6 @@ class Panel:
             self.speech_bubbles: List[SpeechBubble] = []
         else:
             self.speech_bubbles: List[SpeechBubble] = speech_bubbles
-
 
     def to_xml(self):
         element = ET.Element('Panel')
