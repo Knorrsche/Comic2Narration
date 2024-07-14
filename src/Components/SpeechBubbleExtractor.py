@@ -7,6 +7,9 @@ import numpy as np
 import threading
 import logging
 from Utils import ImageUtils as iu
+import pytesseract
+import xml.sax.saxutils as saxutils
+
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -57,9 +60,9 @@ class SpeechBubbleExtractor:
         for speech_bubble_data in result_bubbles['predictions']:
             if speech_bubble_data['confidence'] < 0.3:
                 continue
-            description = self.ocr_text()
             speech_bubble_type:SpeechBubbleType = self.classify_speech_bubble()
             speech_bubble_image = iu.image_from_bbox(page_image,speech_bubble_data)
+            description = self.ocr_text(speech_bubble_image)
             speech_bubble = SpeechBubble(speech_bubble_type,description,speech_bubble_data,speech_bubble_image)
             
             for panel in page.panels:
@@ -68,8 +71,12 @@ class SpeechBubbleExtractor:
         
 
     # TODO: Train a Comic OCR
-    def ocr_text(self):
-        return ''
+    def ocr_text(self,image):
+        # TODO: add tesseract path to .env
+        pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+        text = pytesseract.image_to_string(image)
+        text= bytes(text, 'utf-8').decode('utf-8', 'ignore')
+        return text
     
     # TODO: Train a classifier
     def classify_speech_bubble(self):

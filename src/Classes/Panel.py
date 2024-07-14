@@ -4,12 +4,16 @@ from .SpeechBubble import SpeechBubble
 import xml.etree.ElementTree as ET 
 
 class Panel:
-    def __init__(self,description: str, bounding_box,image = None):
+    def __init__(self,description: str, bounding_box,image = None,speech_bubbles = None):
         self.description = description
         self.bounding_box = bounding_box
         self.image = image
         self.entities: List[Entity] = []
-        self.speech_bubbles: List[SpeechBubble]= []
+
+        if speech_bubbles is None:
+            self.speech_bubbles: List[SpeechBubble] = []
+        else:
+            self.speech_bubbles: List[SpeechBubble] = speech_bubbles
 
 
     def to_xml(self):

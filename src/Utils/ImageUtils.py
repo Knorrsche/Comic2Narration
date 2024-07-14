@@ -1,6 +1,7 @@
 import cv2
 
 
+# TODO: maybe opencv uses BGR instead of RGB
 def draw_bounding_box(image, bbox, color, thickness=2):
     x = int(bbox['x'] - bbox['width'] / 2)
     y = int(bbox['y'] - bbox['height'] / 2)

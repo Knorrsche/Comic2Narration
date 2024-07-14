@@ -7,6 +7,10 @@ from Classes.Page import Page, PageType
 from Classes.Series import Series
 from Utils import ImageUtils as iu
 from inference_sdk import InferenceHTTPClient
+import ollama
+from PIL import Image
+import io
+import cv2
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -63,9 +67,28 @@ class ComicPreprocessor:
         return PageType.SINGLE
 
     # TODO: Image Descriptor
-    @staticmethod
-    def describe_image():
-        return ''
+    def describe_image(self,image):
+
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        pil_image = Image.fromarray(image_rgb)
+
+        image_bytes = io.BytesIO()
+        pil_image.save(image_bytes, format='PNG')
+        image_bytes = image_bytes.getvalue()
+
+        message = {
+            'role': 'user',
+            'content': 'Only answer with what is happening and answer in a short sentence. What is happening in the comic panel?',
+            'images': [image_bytes]
+        }
+
+        res = ollama.chat(
+            model='llava:13b',
+            messages=[message]
+        )
+
+        description = res['message']['content']
+        return description
 
     # TODO: Refactor with extract_speech_bubbles
     def detect_panels(self):
@@ -103,7 +126,7 @@ class ComicPreprocessor:
 
             panel_image = iu.image_from_bbox(page.page_image, panel_data)
 
-            description = self.describe_image()
+            description = self.describe_image(panel_image)
             panel = Panel(description, panel_data, panel_image)
             panels.append(panel)
 
