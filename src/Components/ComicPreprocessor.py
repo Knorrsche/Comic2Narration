@@ -83,7 +83,7 @@ class ComicPreprocessor:
         }
 
         res = ollama.chat(
-            model='llava:13b',
+            model='llava',
             messages=[message]
         )
 

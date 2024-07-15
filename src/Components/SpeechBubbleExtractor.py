@@ -76,6 +76,7 @@ class SpeechBubbleExtractor:
     def ocr_text(self, image):
         # TODO: add tesseract path to .env
         pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+        #pytesseract.pytesseract.tesseract_cmd=r'/usr/bin/tesseract'
         text = pytesseract.image_to_string(image)
         text = bytes(text, 'utf-8').decode('utf-8', 'ignore')
         return text
