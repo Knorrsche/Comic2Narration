@@ -23,32 +23,17 @@ def image_from_bbox(image, bbox):
 
 
 def is_bbox_overlapping(bbox_1, bbox_2):
-    x1 = bbox_1['x']
-    y1 = bbox_1['y']
-    w1 = bbox_1['width']
-    h1 = bbox_1['height']
+    x1_left = bbox_1['x'] - bbox_1['width'] / 2
+    x1_right = bbox_1['x'] + bbox_1['width'] / 2
+    y1_top = bbox_1['y'] - bbox_1['height'] / 2
+    y1_bottom = bbox_1['y'] + bbox_1['height'] / 2
 
-    x2 = bbox_2['x']
-    y2 = bbox_2['y']
-    w2 = bbox_2['width']
-    h2 = bbox_2['height']
+    x2_left = bbox_2['x'] - bbox_2['width'] / 2
+    x2_right = bbox_2['x'] + bbox_2['width'] / 2
+    y2_top = bbox_2['y'] - bbox_2['height'] / 2
+    y2_bottom = bbox_2['y'] + bbox_2['height'] / 2
 
-    x1_left = x1 - w1
-    x1_right = x1 + w1
-    y1_top = y1 - h1
-    y1_bottom = y1 + h1
-    x2_left = x2 - w2
-    x2_right = x2 + w2
-    y2_top = y2 - h2
-    y2_bottom = y2 + h2
-
-    if (x1_right >= x2_left and x1_left <= x2_right and
-            y1_bottom >= y2_top and y1_top <= y2_bottom):
+    if (x2_left <= x1_right and x2_right >= x1_left) and (y2_top <= y1_bottom and y2_bottom >= y1_top):
         return True
     else:
-        if (x1_right == x2_left or x1_left == x2_right) and (y1_bottom >= y2_top and y1_top <= y2_bottom):
-            return True
-        if (y1_bottom == y2_top or y1_top == y2_bottom) and (x1_right >= x2_left and x1_left <= x2_right):
-            return True
-
         return False

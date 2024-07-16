@@ -131,4 +131,6 @@ class ComicPreprocessor:
             panels.append(panel)
 
         # TODO: Sort Panels by position
+        panels = sorted(panels, key=lambda p: ( (p.bounding_box['y']-p.bounding_box['height']/2),
+                                                (p.bounding_box['x'])-p.bounding_box['width']/2))
         page.panels = panels

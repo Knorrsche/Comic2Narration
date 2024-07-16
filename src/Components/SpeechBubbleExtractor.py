@@ -52,7 +52,6 @@ class SpeechBubbleExtractor:
         page_image = page.page_image
 
         result_bubbles = CLIENT_BUBBLE.infer(page_image, model_id="bubble-detection-gbjon/2")
-        speech_bubbles = []
         for speech_bubble_data in result_bubbles['predictions']:
             if speech_bubble_data['confidence'] < 0.3:
                 continue
@@ -60,18 +59,15 @@ class SpeechBubbleExtractor:
             speech_bubble_image = iu.image_from_bbox(page_image, speech_bubble_data)
             description = self.ocr_text(speech_bubble_image)
             speech_bubble = SpeechBubble(speech_bubble_type, description, speech_bubble_data, speech_bubble_image)
-            speech_bubbles.append(speech_bubble)
+
+            for panel in page.panels:
+                if iu.is_bbox_overlapping(panel.bounding_box,speech_bubble.bounding_box):
+                    panel.speech_bubbles.append(speech_bubble)
 
         for panel in page.panels:
-            panel.speech_bubbles = []
-            speech_bubbles_remove = []
-            for speech_bubble in speech_bubbles:
-                if iu.is_bbox_overlapping(speech_bubble.bounding_box, panel.bounding_box, ):
-                    panel.speech_bubbles.append(speech_bubble)
-                    speech_bubbles_remove.append(speech_bubble)
-            for speech_bubble in speech_bubbles_remove:
-                speech_bubbles.remove(speech_bubble)
-
+            speech_bubbles = panel.speech_bubbles
+            panel.speech_bubbles = sorted(speech_bubbles, key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height'] / 2),
+                                                   (p.bounding_box['x']) - p.bounding_box['width'] / 2))
     # TODO: Train a Comic OCR
     def ocr_text(self, image):
         # TODO: add tesseract path to .env
