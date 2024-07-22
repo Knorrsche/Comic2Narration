@@ -5,6 +5,7 @@ from Classes.Panel import Panel
 from Classes.Comic import Comic
 from Classes.Page import Page, PageType
 from Classes.Series import Series
+from Classes.Entity import Entity
 from Utils import ImageUtils as iu
 from inference_sdk import InferenceHTTPClient
 import ollama
@@ -28,6 +29,7 @@ class ComicPreprocessor:
         page_pairs = self.convert_array_to_page_pairs(rgb_arrays)
         self.current_comic = self.convert_images_to_comic(name, volume, main_series, secondary_series, page_pairs)
         self.detect_panels()
+        self.detect_entities()
 
     @staticmethod
     def convert_images_to_comic(name: str, volume: int, main_series: Series,
@@ -126,7 +128,8 @@ class ComicPreprocessor:
 
             panel_image = iu.image_from_bbox(page.page_image, panel_data)
 
-            description = self.describe_image(panel_image)
+            #description = self.describe_image(panel_image)
+            description = 'text'
             panel = Panel(description, panel_data, panel_image)
             panels.append(panel)
 
@@ -134,3 +137,51 @@ class ComicPreprocessor:
         panels = sorted(panels, key=lambda p: ( (p.bounding_box['y']-p.bounding_box['height']/2),
                                                 (p.bounding_box['x'])-p.bounding_box['width']/2))
         page.panels = panels
+
+    def detect_entities(self):
+        threads = []
+
+        for i, page_pair in enumerate(self.current_comic.page_pairs):
+            for page in page_pair:
+                if not page:
+                    continue
+
+                thread = threading.Thread(target=self.handel_detect_entity, args=(page,))
+                threads.append(thread)
+                logging.debug(f'Starting Entity Extraction thread for page {page.page_index}')
+                thread.start()
+
+            for thread in threads:
+                thread.join()
+                logging.debug(f'Threads for Entity Extraction of page_pair {i} finished')
+            threads = []
+            logging.debug('\n')
+
+    def handel_detect_entity(self,page:Page):
+
+        CLIENT = InferenceHTTPClient(
+            api_url="https://detect.roboflow.com",
+            api_key="bbQfI1dqQMBQJJnHI4AU"
+        )
+
+        result_entities = CLIENT.infer(page.page_image, model_id="marvel_chars/1")
+        entities = []
+
+        for entity_data in result_entities['predictions']:
+            if entity_data['confidence'] <0:
+                continue
+
+            entitiy_image = iu.image_from_bbox(page.page_image, entity_data)
+            entity = Entity(entity_data)
+            entities.append(entity)
+
+            for panel in page.panels:
+                if iu.is_bbox_overlapping(panel.bounding_box, entity.bounding_box):
+                    panel.entities.append(entity)
+
+        for panel in page.panels:
+            entities = panel.entities
+            panel.entities = sorted(entities,
+                                          key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height'] / 2),
+                                                         (p.bounding_box['x']) - p.bounding_box['width'] / 2))
+

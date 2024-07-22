@@ -15,6 +15,7 @@ class ComicDisplayPage:
         self.last_window_width = self.parent.root.winfo_width()
         self.show_speech_bubbles = True
         self.show_panels = True
+        self.show_entities = True
         self.import_path = filepath
 
         self.menu = tk.Menu(self.parent.root)
@@ -66,6 +67,7 @@ class ComicDisplayPage:
         self.menu.add_cascade(label="Display", menu=display_menu)
         display_menu.add_command(label="Toggle Panels", command=self.toggle_panels)
         display_menu.add_command(label="Toggle Speech Bubbles", command=self.toggle_speech_bubbles)
+        display_menu.add_command(label="Toggle Entities",command=self.toggle_entities)
 
     def display_images(self):
         if self.current_page_pair_index < 0 or self.current_page_pair_index >= len(self.comic.page_pairs):
@@ -75,9 +77,9 @@ class ComicDisplayPage:
         right_page: Page = self.comic.page_pairs[self.current_page_pair_index][1]
 
         left_image_array = left_page.annotated_image(self.show_panels,
-                                                     self.show_speech_bubbles) if left_page is not None else self.create_blank_image()
+                                                     self.show_speech_bubbles,self.show_entities) if left_page is not None else self.create_blank_image()
         right_image_array = right_page.annotated_image(self.show_panels,
-                                                       self.show_speech_bubbles) if right_page is not None else self.create_blank_image()
+                                                       self.show_speech_bubbles,self.show_entities) if right_page is not None else self.create_blank_image()
 
         self.left_image = Image.fromarray(left_image_array)
         self.right_image = Image.fromarray(right_image_array)
@@ -142,6 +144,10 @@ class ComicDisplayPage:
 
     def toggle_speech_bubbles(self):
         self.show_speech_bubbles = not self.show_speech_bubbles
+        self.display_images()
+
+    def toggle_entities(self):
+        self.show_entities = not self.show_entities
         self.display_images()
 
     def export_as_xml(self):

@@ -18,6 +18,8 @@ class Page:
     bbox_thickness_panel = 2
     bbox_color_speech_bubble = (255, 0, 0)
     bbox_thickness_speech_bubble = 2
+    bbox_color_entity = (0,0,255)
+    bbox_thickness_entity = 2
 
     # TODO: refactor height and width ou
     def __init__(self, page_index: int, page_type: PageType,
@@ -31,13 +33,18 @@ class Page:
             self.height = height
             self.width = width
 
-    def annotated_image(self, draw_panels: bool, draw_speech_bubbles: bool):
+    def annotated_image(self, draw_panels: bool, draw_speech_bubbles: bool,draw_entities:bool):
         new_image = self.page_image.copy()
 
         for panel in self.panels:
             new_image = iU.draw_bounding_box(
                 new_image, panel.bounding_box, self.bbox_color_panel, self.bbox_thickness_panel
             ) if draw_panels is True else new_image
+
+            for entity in panel.entities:
+                new_image = iU.draw_bounding_box(
+                    new_image,entity.bounding_box,self.bbox_color_entity,self.bbox_thickness_entity
+                ) if draw_entities is True else new_image
 
             if not draw_speech_bubbles:
                 continue
