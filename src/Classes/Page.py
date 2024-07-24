@@ -15,11 +15,11 @@ class PageType(Enum):
 
 class Page:
     bbox_color_panel = (0, 255, 0)
-    bbox_thickness_panel = 2
+    bbox_thickness_panel = 4
     bbox_color_speech_bubble = (255, 0, 0)
-    bbox_thickness_speech_bubble = 2
+    bbox_thickness_speech_bubble = 4
     bbox_color_entity = (0,0,255)
-    bbox_thickness_entity = 2
+    bbox_thickness_entity = 4
 
     # TODO: refactor height and width ou
     def __init__(self, page_index: int, page_type: PageType,

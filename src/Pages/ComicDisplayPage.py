@@ -4,6 +4,11 @@ import numpy as np
 from PIL import Image, ImageTk
 from Classes import Page
 from Utils import IOUtils as io
+from pygame import mixer
+import tkinter.font as fnt
+import pygame
+import pyttsx3
+import os
 
 
 class ComicDisplayPage:
@@ -16,7 +21,11 @@ class ComicDisplayPage:
         self.show_speech_bubbles = True
         self.show_panels = True
         self.show_entities = True
+        self.show_text = False
         self.import_path = filepath
+
+        self.engine = pyttsx3.init()
+        self.buttons = []
 
         self.menu = tk.Menu(self.parent.root)
         self.parent.root.config(menu=self.menu)
@@ -60,14 +69,15 @@ class ComicDisplayPage:
         self.menu.add_cascade(label="Export", menu=export_menu)
         export_menu.add_command(label="Export XML", command=self.export_as_xml)
         export_menu.add_command(label="Export Annotated PDF", command=self.export_as_annotated_pdf)
-        export_menu.add_command(label="Export Script",command=self.export_as_script)
-        export_menu.add_command(label="Export MP3",command=self.export_as_mp3)
+        export_menu.add_command(label="Export Script", command=self.export_as_script)
+        export_menu.add_command(label="Export MP3", command=self.export_as_mp3)
 
         display_menu = tk.Menu(self.menu, tearoff=0)
         self.menu.add_cascade(label="Display", menu=display_menu)
         display_menu.add_command(label="Toggle Panels", command=self.toggle_panels)
         display_menu.add_command(label="Toggle Speech Bubbles", command=self.toggle_speech_bubbles)
-        display_menu.add_command(label="Toggle Entities",command=self.toggle_entities)
+        display_menu.add_command(label="Toggle Entities", command=self.toggle_entities)
+        display_menu.add_command(label="Toggle Text",command=self.toggle_text)
 
     def display_images(self):
         if self.current_page_pair_index < 0 or self.current_page_pair_index >= len(self.comic.page_pairs):
@@ -77,9 +87,11 @@ class ComicDisplayPage:
         right_page: Page = self.comic.page_pairs[self.current_page_pair_index][1]
 
         left_image_array = left_page.annotated_image(self.show_panels,
-                                                     self.show_speech_bubbles,self.show_entities) if left_page is not None else self.create_blank_image()
+                                                     self.show_speech_bubbles,
+                                                     self.show_entities) if left_page is not None else self.create_blank_image()
         right_image_array = right_page.annotated_image(self.show_panels,
-                                                       self.show_speech_bubbles,self.show_entities) if right_page is not None else self.create_blank_image()
+                                                       self.show_speech_bubbles,
+                                                       self.show_entities) if right_page is not None else self.create_blank_image()
 
         self.left_image = Image.fromarray(left_image_array)
         self.right_image = Image.fromarray(right_image_array)
@@ -89,6 +101,8 @@ class ComicDisplayPage:
     def resize_and_update_images(self):
         if self.left_image is None or self.right_image is None:
             return
+
+        original_width, original_height = self.left_image.size
 
         max_width = self.parent.root.winfo_width() // 2
         max_height = self.parent.root.winfo_height()
@@ -107,6 +121,12 @@ class ComicDisplayPage:
 
         self.label_left.bind('<Button-1>', self.show_previous_page_pair)
         self.label_right.bind('<Button-1>', self.show_next_page_pair)
+
+        width_scale = max_width / original_width
+        height_scale = max_height / original_height
+
+        if self.show_text:
+            self.create_interactive_buttons(width_scale, height_scale)
 
     def create_blank_image(self):
         width, height = 800, 600
@@ -128,12 +148,12 @@ class ComicDisplayPage:
         self.resize_and_update_images()
         self.resize_pending = None
 
-    def show_previous_page_pair(self, event):
+    def show_previous_page_pair(self, event=None):
         if self.current_page_pair_index > 0:
             self.current_page_pair_index -= 1
             self.display_images()
 
-    def show_next_page_pair(self, event):
+    def show_next_page_pair(self, event=None):
         if self.current_page_pair_index < len(self.comic.page_pairs) - 1:
             self.current_page_pair_index += 1
             self.display_images()
@@ -150,6 +170,16 @@ class ComicDisplayPage:
         self.show_entities = not self.show_entities
         self.display_images()
 
+    def toggle_text(self):
+        self.show_text = not self.show_text
+
+        if not self.show_text:
+            for button in self.buttons:
+                button.destroy()
+            self.buttons = []
+
+        self.display_images()
+
     def export_as_xml(self):
         export_path = filedialog.asksaveasfilename(defaultextension=".xml",
                                                    filetypes=[("XML Files", "*.xml")],
@@ -159,11 +189,10 @@ class ComicDisplayPage:
             xml_str = io.prettify_xml(xml)
             io.save_xml_to_file(export_path, xml_str)
 
-            messagebox.showinfo("Export Successfull", "The XML was exported successfully")
+            messagebox.showinfo("Export Successful", "The XML was exported successfully")
         else:
             messagebox.showerror("Error", "Error while trying to export, please try again")
 
-    # TODO: make universal export function
     def export_as_annotated_pdf(self):
         export_path = filedialog.asksaveasfilename(defaultextension=".pdf",
                                                    filetypes=[("PDF files", "*.pdf")],
@@ -172,7 +201,7 @@ class ComicDisplayPage:
         if export_path:
             xml = self.comic.to_xml()
             xml_str = io.prettify_xml(xml)
-            io.add_annotation_to_pdf(self.import_path, xml_str,export_path)
+            io.add_annotation_to_pdf(self.import_path, xml_str, export_path)
 
             messagebox.showinfo("Export Successfully", "The annotated PDF was exported successfully")
         else:
@@ -184,7 +213,7 @@ class ComicDisplayPage:
                                                    title="Select where to save the Script")
 
         if export_path:
-            io.save_script_as_txt(export_path,self.comic.to_narrative())
+            io.save_script_as_txt(export_path, self.comic.to_narrative())
 
             messagebox.showinfo("Export Successfully", "The Script was exported successfully")
         else:
@@ -196,16 +225,72 @@ class ComicDisplayPage:
                                                    title="Select where to save the MP3")
 
         if export_path:
-            io.save_script_as_mp3(export_path,self.comic.to_narrative())
+            io.save_script_as_mp3(export_path, self.comic.to_narrative())
 
             messagebox.showinfo("Export Successfully", "The MP3 was exported successfully")
         else:
             messagebox.showerror("Error", "Error while trying to export, please try again")
 
-    #TODO: Add load comic
+    # TODO: Add load comic
     def open_comic(self):
         pass
 
     # TODO: Add save comic
     def save_comic(self):
         pass
+
+    def create_interactive_buttons(self, width_scale, height_scale):
+        for button in self.buttons:
+            button.destroy()
+        self.buttons = []
+
+        left_page = self.comic.page_pairs[self.current_page_pair_index][0]
+        if left_page:
+            self.create_buttons_for_page(left_page, self.frame_left, width_scale, height_scale)
+
+        right_page = self.comic.page_pairs[self.current_page_pair_index][1]
+        if right_page:
+            self.create_buttons_for_page(right_page, self.frame_right, width_scale, height_scale)
+
+    def create_buttons_for_page(self, page, frame, width_scale, height_scale):
+        for panel in page.panels:
+            for speech_bubble in panel.speech_bubbles:
+                bbox = speech_bubble.bounding_box
+                x = int(bbox['x'] - bbox['width'] / 2) * width_scale
+                y = int(bbox['y'] - bbox['height'] / 2) * height_scale
+                w = int(bbox['width']) * width_scale
+                h = int(bbox['height']) * height_scale
+
+                button = tk.Button(frame, bg="white", text=speech_bubble.text, font = fnt.Font(size = 6),borderwidth=0, highlightthickness=0,
+                                   command=lambda e=speech_bubble: self.on_speech_bubble_click(e))
+
+                button.place(x=x, y=y, width=w, height=h)
+                self.buttons.append(button)
+
+    def on_speech_bubble_click(self, speech_bubble):
+
+        text = speech_bubble.text
+
+        if text == '':
+            return
+
+        text = text.replace("\n", " ")
+        voices = self.engine.getProperty('voices')
+        self.engine.setProperty('volume', 1.0)
+        self.engine.setProperty('voice', voices[1].id)
+        self.engine.setProperty('rate', 200)
+        outfile = "temp.wav"
+        self.engine.save_to_file(text, outfile)
+        self.engine.runAndWait()
+
+        mixer.init()
+        mixer.music.load("temp.wav")
+        mixer.music.play()
+
+        while mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
+
+        mixer.music.stop()
+        mixer.quit()
+        if os.path.isfile(outfile):
+            os.remove(outfile)

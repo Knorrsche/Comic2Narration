@@ -13,7 +13,7 @@ class Entity:
         element = eT.Element('Entity')
         eT.SubElement(element, 'Name').text = self.get_entity_template_name()
         bbox = eT.SubElement(element, 'BoundingBox')
-        bbox.text = ','.join(map(str, self.bounding_box))
+        bbox.text = ','.join(f"{key}:{value}" for key, value in self.bounding_box.items())
         return element
 
     # TODO: Update if entity & entity_template are getting implemented

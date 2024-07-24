@@ -106,14 +106,21 @@ def parse_speech_bubble(sb_elem):
         bounding_box=parse_bounding_box(sb_elem.find('BoundingBox').text)
     )
 
+def parase_entities(en_elem):
+    return Entity(
+        bounding_box=parse_bounding_box(en_elem.find('BoundingBox').text),
+    )
 
 def parse_panel(panel_elem):
     speech_bubbles = [parse_speech_bubble(sb) for sb in panel_elem.find('SpeechBubbles')]
-    return Panel(
+    entities = [parase_entities(en) for en in panel_elem.find('Entities')]
+    panel = Panel(
         description=panel_elem.find('Description').text,
         bounding_box=parse_bounding_box(panel_elem.find('BoundingBox').text),
-        speech_bubbles=speech_bubbles
+        speech_bubbles=speech_bubbles,
     )
+    panel.entities = entities
+    return panel
 
 
 def parse_page(page_elem):
