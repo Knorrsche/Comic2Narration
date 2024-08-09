@@ -10,11 +10,19 @@ class Panel:
         self.bounding_box = bounding_box
         self.image = image
         self.entities: List[Entity] = []
+        self.descriptions = []
 
         if speech_bubbles is None:
             self.speech_bubbles: List[SpeechBubble] = []
         else:
             self.speech_bubbles: List[SpeechBubble] = speech_bubbles
+
+    def get_transcript(self):
+        transcript = ''
+        for i, speech_bubble in enumerate(self.speech_bubbles):
+            transcript += f'Speech Bubble {i + 1}: {speech_bubble.text}/n'
+        transcript += '\n'
+        return transcript
 
     def to_xml(self):
         element = ET.Element('Panel')

@@ -8,6 +8,8 @@ class Entity:
 
     def __init__(self, bounding_box: Tuple[float, float, float, float]):
         self.bounding_box = bounding_box
+        self.image = None
+        self.tags = []
 
     def to_xml(self):
         element = eT.Element('Entity')

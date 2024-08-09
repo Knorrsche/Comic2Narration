@@ -86,7 +86,7 @@ class FileInputPage:
 
         rgb_arrays = convert_pdf_to_image(file_path)
         self.comic_preprocessor = ComicPreprocessor(name, volume, main_series, secondary_series, rgb_arrays)
-        self.speech_bubble_extractor = SpeechBubbleExtractor(self.comic_preprocessor.current_comic)
+        self.speech_bubble_extractor = SpeechBubbleExtractor(self.comic_preprocessor.current_comic,self.comic_preprocessor)
         self.parent.show_comic_display_screen(self.speech_bubble_extractor.current_comic, file_path)
 
     def import_comic(self):

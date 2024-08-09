@@ -2,6 +2,8 @@ from PIL import Image
 import numpy as np
 import fitz
 import xml.etree.ElementTree as eT
+import xml.sax.saxutils as saxutils
+
 from xml.dom import minidom
 import pathlib
 import tempfile
@@ -11,6 +13,45 @@ import os
 
 from src.Classes import PageType, SpeechBubbleType, Series, Comic, Page, Panel, Entity, EntityTemplate, SpeechBubble
 from src.Utils.ImageUtils import image_from_bbox
+
+
+def escape_text(text, reverse=False):
+    if text is None: return text
+    
+    text = text.encode('utf-8').decode('utf-8')
+
+    escaped_text = saxutils.escape(text)
+
+    xml_friendly_text = escaped_text.replace('\n', ' ')
+
+    special_chars = {
+        '&':'&amp;',
+        '©': '&copy;',
+        '®': '&reg;',
+        '™': '&trade;',
+        '€': '&euro;',
+        '£': '&pound;',
+        '’': '&rsquo;',
+        '‘': '&lsquo;',
+        '“': '&ldquo;',
+        '”': '&rdquo;',
+        '|': '&#124;',
+        '—': '&mdash;',
+        '–': '&ndash;',
+        '»': '&raquo;',
+        '¥': '&yen;',
+        '«': '&laquo;',
+        '¢': '&cent;'
+    }
+
+    if reverse:
+        for char, entity in special_chars.items():
+            xml_friendly_text = xml_friendly_text.replace(entity, char)
+    else:
+        for char, entity in special_chars.items():
+            xml_friendly_text = xml_friendly_text.replace(char, entity)
+
+    return xml_friendly_text
 
 
 def convert_pdf_to_image(pdf_path: str):
@@ -38,6 +79,7 @@ def save_xml_to_file(filepath, xml_str):
     with open(filepath, 'w') as file:
         file.write(xml_str)
 
+
 # TODO: currently, the text is only getting processed after export to xml, add process before
 def save_script_as_txt(filepath, script):
     with open(filepath, 'w') as file:
@@ -49,10 +91,11 @@ def save_script_as_mp3(filepath, script):
     #tts.save(filepath)
     engine = pyttsx3.init()
     voices = engine.getProperty('voices')
-    engine.setProperty('voice',voices[1].id )
+    engine.setProperty('voice', voices[1].id)
     engine.save_to_file(script, filepath)
     engine.runAndWait()
     print(f'Created MP3 file: {filepath}')
+
 
 def read_xml_from_pdf(pdf_path: str):
     doc = fitz.open(pdf_path)
@@ -102,14 +145,16 @@ def parse_bounding_box(bbox_str):
 def parse_speech_bubble(sb_elem):
     return SpeechBubble(
         type=SpeechBubbleType[sb_elem.find('Type').text.upper()],
-        text=sb_elem.find('Text').text,
+        text=escape_text(sb_elem.find('Text').text, reverse=True),
         bounding_box=parse_bounding_box(sb_elem.find('BoundingBox').text)
     )
+
 
 def parase_entities(en_elem):
     return Entity(
         bounding_box=parse_bounding_box(en_elem.find('BoundingBox').text),
     )
+
 
 def parse_panel(panel_elem):
     speech_bubbles = [parse_speech_bubble(sb) for sb in panel_elem.find('SpeechBubbles')]

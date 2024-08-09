@@ -10,6 +10,8 @@ from Utils import ImageUtils as iu
 import pytesseract
 import xml.sax.saxutils as saxutils
 
+from src.Components import ComicPreprocessor
+
 logging.basicConfig(
     level=logging.DEBUG,
     format='[%(asctime)s] %(message)s',
@@ -19,9 +21,10 @@ logging.basicConfig(
 
 class SpeechBubbleExtractor:
 
-    def __init__(self, current_comic: Comic):
+    def __init__(self, current_comic: Comic,comic_preprocessor: ComicPreprocessor):
         self.current_comic = current_comic
         self.extract_speech_bubbles()
+        #comic_preprocessor.improve_panel_descriptions()
 
     #TODO: Refactor with detect_panel
     def extract_speech_bubbles(self):

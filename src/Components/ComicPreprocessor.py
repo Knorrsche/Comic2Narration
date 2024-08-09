@@ -24,12 +24,28 @@ class ComicPreprocessor:
     current_comic: Comic
     export_path: str
 
+
+    str_general_instuction = ('GENERAL INSTRUCTIONS:\n'
+                              '    You are a expert in Comic summarization. Your task is to describe what is happening in an image of a comic panel.\n'
+                              '    You will also get context in form of text from speech bubbles, but you are not allowed to return the words from the speech bubbles.\n'
+                              '    You should only use the text as a reference to improve the panel description.\n'
+                              '    Answer in a short sentence and try to only describe information\'s that are needed to understand the narrative. \n'
+                              '    Do not talk about speech bubbles and do not recite them.\n'
+                              '    When answering do not mention that this is an image or comic. Answer like you would write a Novel.\n'
+                              '    \n'
+                              '    Example: A shadow is fighting against a Robot at night. A police officer is helping.\n'
+                              '    \n'
+                              )
+
+
+
     def __init__(self, name: str, volume: int, main_series: Series, secondary_series: Optional[List[Series]],
                  rgb_arrays):
         page_pairs = self.convert_array_to_page_pairs(rgb_arrays)
         self.current_comic = self.convert_images_to_comic(name, volume, main_series, secondary_series, page_pairs)
         self.detect_panels()
         self.detect_entities()
+        self.create_tags()
 
     @staticmethod
     def convert_images_to_comic(name: str, volume: int, main_series: Series,
@@ -80,7 +96,7 @@ class ComicPreprocessor:
 
         message = {
             'role': 'user',
-            'content': 'Only answer with what is happening and answer in a short sentence. What is happening in the comic panel?',
+            'content': self.str_general_instuction,
             'images': [image_bytes]
         }
 
@@ -92,7 +108,185 @@ class ComicPreprocessor:
         description = res['message']['content']
         return description
 
-    # TODO: Refactor with extract_speech_bubbles
+    def improve_panel_descriptions(self):
+        threads = []
+
+        for i, page_pair in enumerate(self.current_comic.page_pairs):
+            for page in page_pair:
+                if not page:
+                    continue
+
+                thread = threading.Thread(target=self.handle_improve_panels_neighbors, args=(page,))
+                threads.append(thread)
+                logging.debug(f'Starting Description Improvement with neighbors thread for page {page.page_index}')
+                thread.start()
+
+            for thread in threads:
+                thread.join()
+                logging.debug(f'Threads for Panel Extraction with neighbors of page_pair {i} finished')
+            threads = []
+            logging.debug('\n')
+
+        for i, page_pair in enumerate(self.current_comic.page_pairs):
+            for page in page_pair:
+                if not page:
+                    continue
+
+                thread = threading.Thread(target=self.handle_improve_panels_page, args=(page,))
+                threads.append(thread)
+                logging.debug(f'Starting Description Improvement with neighbors thread for page {page.page_index}')
+                thread.start()
+
+            for thread in threads:
+                thread.join()
+                logging.debug(f'Threads for Panel Extraction with neighbors of page_pair {i} finished')
+            threads = []
+            logging.debug('\n')
+
+
+    def handle_improve_panels_page(self,page):
+        panels = page.panels
+        str_page_context = 'This is the context of the whole Page. Use this to improve the description of the Current Panel. \n'
+        # Make page get transcript function
+        for i,panel in enumerate(panels):
+            str_page_context += f'Panel {i + 1} Description: {panel.description}\n'
+            #str_page_context += f'Panel {i + 1} Speech Bubbles: {panel.get_transcript}\n'
+
+        for i,panel in enumerate(panels):
+            str_context = ''
+            str_context += str_page_context
+            str_context += f'Current Panel {i+1} Description: {panel.description}\n'
+            #str_context += f'Current Panel {i+1} Speech Bubbles: {panel.get_transcript}\n'
+
+
+            image_rgb = cv2.cvtColor(panel.image, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(image_rgb)
+
+            image_bytes = io.BytesIO()
+            pil_image.save(image_bytes, format='PNG')
+            image_bytes = image_bytes.getvalue()
+
+            message = {
+                'role': 'user',
+                'content': str_context + '\n' + '\n' + self.str_general_instuction + '\n' + '\n' + 'Improve the Current Panel description following the general istruction and use as few words as possible',
+                'images': [image_bytes]
+            }
+
+            res = ollama.chat(
+                model='llava',
+                messages=[message]
+            )
+
+            description = res['message']['content']
+            panel.descriptions.append(description)
+            panel.description = description
+
+
+    def handle_improve_panels_neighbors(self,page):
+        panels = page.panels
+        for i,panel in enumerate(panels):
+            str_context = ''
+            current_panel = panel
+            if i != 0:
+                previous_panel = panels[i-1]
+                str_context += f'Previous Panel Description: {previous_panel.description}\n'
+                #str_context += f'Previous Panel Speech Bubbles: {previous_panel.get_transcript}\n'
+            if i != len(panels) - 1:
+                next_panel = panels[i+1]
+                str_context += f'Next Panel Description: {next_panel.description}\n'
+                #str_context += f'Next Panel Speech Bubbles: {next_panel.get_transcript}\n'
+            str_context += f'Current Panel Description: {current_panel.description}\n'
+            #str_context += f'Current Panel Speech Bubbles: {current_panel.get_transcript}\n'
+
+            image_rgb = cv2.cvtColor(current_panel.image, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(image_rgb)
+
+            image_bytes = io.BytesIO()
+            pil_image.save(image_bytes, format='PNG')
+            image_bytes = image_bytes.getvalue()
+
+            message = {
+                'role': 'user',
+                'content': str_context + '\n' + '\n' + self.str_general_instuction + '\n' + '\n' + 'Improve the Current Panel description following the general istruction and use as few words as possible.',
+                'images': [image_bytes]
+            }
+
+            res = ollama.chat(
+                model='llava',
+                messages=[message]
+            )
+
+            description = res['message']['content']
+            panel.descriptions.append(description)
+            panel.description = description
+
+
+    def create_tags(self):
+        threads = []
+
+        for i, page_pair in enumerate(self.current_comic.page_pairs):
+            for page in page_pair:
+                if not page:
+                    continue
+
+                thread = threading.Thread(target=self.handle_create_tags, args=(page,))
+                threads.append(thread)
+                logging.debug(f'Starting Tag creation thread for page {page.page_index}')
+                thread.start()
+
+            for thread in threads:
+                thread.join()
+                logging.debug(f'Threads for Tag creation with neighbors of page_pair {i} finished')
+            threads = []
+            logging.debug('\n')
+
+    def handle_create_tags(self,page):
+        panels = page.panels
+        for panel in panels:
+            for entity in panel.entities:
+                entity.image = iu.image_from_bbox(panel.image, entity.bounding_box)
+                if entity.image is None:
+                    continue
+                image_rgb = cv2.cvtColor(entity.image, cv2.COLOR_BGR2RGB)
+                pil_image = Image.fromarray(image_rgb)
+
+                image_bytes = io.BytesIO()
+                pil_image.save(image_bytes, format='PNG')
+                image_bytes = image_bytes.getvalue()
+
+                message = {
+                    'role': 'user',
+                    'content': 'Describe the Character and Background visually. Explain descriptive what you see in this image in context that you already know this is an image of a comic character in a scene. '
+                               'Answer with details like hairstyle, haircolor, gender, clother but also about the background like place, job, activity.',
+                    'images': [image_bytes]
+                }
+
+                res = ollama.chat(
+                    model='llava',
+                    messages=[message]
+                )
+
+                description = res['message']['content']
+
+                print(description)
+
+                message = {
+                    'role': 'user',
+                    'content': f'Given this Description: {description} - You are an image tag converter for comics characters. Convert this description to a list of tags like this with the delmimter ";"  Woman;Blonde;Dress;Night;Store and only answer with these Tags.',
+                }
+
+                res = ollama.chat(
+                    model='llama3',
+                    messages=[message]
+                )
+                response = res['message']['content'].replace(".*:","")
+                print(response)
+                tags = response.split(';')
+                for tag in tags:
+                    tag = tag.strip()
+                entity.tags = tags
+
+    #TODO: Refactor with extract_speech_bubbles
     def detect_panels(self):
         threads = []
 
@@ -128,12 +322,11 @@ class ComicPreprocessor:
 
             panel_image = iu.image_from_bbox(page.page_image, panel_data)
 
-            #description = self.describe_image(panel_image)
-            description = 'text'
+            description = self.describe_image(panel_image)
             panel = Panel(description, panel_data, panel_image)
+            panel.descriptions.append(panel.description)
             panels.append(panel)
 
-        # TODO: Sort Panels by position
         panels = sorted(panels, key=lambda p: ( (p.bounding_box['y']-p.bounding_box['height']/2),
                                                 (p.bounding_box['x'])-p.bounding_box['width']/2))
         page.panels = panels

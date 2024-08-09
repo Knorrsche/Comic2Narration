@@ -254,6 +254,16 @@ class ComicDisplayPage:
 
     def create_buttons_for_page(self, page, frame, width_scale, height_scale):
         for panel in page.panels:
+            button = tk.Button(frame,bg='white',text=panel.description,font=fnt.Font(size=6),borderwidth=0, highlightthickness= 0,
+                               command = lambda e=panel: self.on_panel_click(e))
+            bbox = panel.bounding_box
+            x = int(bbox['x'] - bbox['width'] / 2) * width_scale
+            y = int(bbox['y'] - bbox['height'] / 2) * height_scale
+            w = int(bbox['width']) * width_scale
+            h = int(bbox['height']) * height_scale
+            button.place(x=(w-x)/2, y=(h-y)/2, width=(w-x)/10, height=(h-y)/10)
+            self.buttons.append(button)
+
             for speech_bubble in panel.speech_bubbles:
                 bbox = speech_bubble.bounding_box
                 x = int(bbox['x'] - bbox['width'] / 2) * width_scale
@@ -266,6 +276,34 @@ class ComicDisplayPage:
 
                 button.place(x=x, y=y, width=w, height=h)
                 self.buttons.append(button)
+
+    #TODO: refactor with speechbubble
+    def on_panel_click(self,panel):
+        text = panel.description
+
+        if text == '':
+            return
+
+        text = text.replace("\n", " ")
+        voices = self.engine.getProperty('voices')
+        self.engine.setProperty('volume', 1.0)
+        self.engine.setProperty('voice', voices[1].id)
+        self.engine.setProperty('rate', 200)
+        outfile = "temp.wav"
+        self.engine.save_to_file(text, outfile)
+        self.engine.runAndWait()
+
+        mixer.init()
+        mixer.music.load("temp.wav")
+        mixer.music.play()
+
+        while mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
+
+        mixer.music.stop()
+        mixer.quit()
+        if os.path.isfile(outfile):
+            os.remove(outfile)
 
     def on_speech_bubble_click(self, speech_bubble):
 
