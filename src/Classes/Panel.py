@@ -9,6 +9,8 @@ class Panel:
         self.description = description
         self.bounding_box = bounding_box
         self.image = image
+        self.starting_tag = False
+        self.scene_id = 0
         self.entities: List[Entity] = []
         self.descriptions = []
 
@@ -28,6 +30,8 @@ class Panel:
         element = ET.Element('Panel')
 
         ET.SubElement(element, 'Description').text = self.description
+        ET.SubElement(element,'Scene_Id').text = str(self.scene_id)
+        ET.SubElement(element, 'Starting_Tag').text = str(self.starting_tag)
 
         bbox = ET.SubElement(element, 'BoundingBox')
         bbox.text = ','.join(f"{key}:{value}" for key, value in self.bounding_box.items())
@@ -40,5 +44,4 @@ class Panel:
         for speech_bubble in self.speech_bubbles:
             speech_bubbles_element.append(speech_bubble.to_xml())
 
-        # Return the XML element
         return element

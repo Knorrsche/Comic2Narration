@@ -62,6 +62,7 @@ class ComicDisplayPage:
         self.menu.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Open", command=self.open_comic)
         file_menu.add_command(label="Save", command=self.save_comic)
+        file_menu.add_command(label="Match Entities", command=self.match_entities)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.parent.root.quit)
 
@@ -239,6 +240,57 @@ class ComicDisplayPage:
     def save_comic(self):
         pass
 
+    def match_entities(self):
+        input_window = tk.Toplevel(self.parent.root)
+        input_window.title("Input Cluster Sizes")
+
+        num_entities = len(self.comic.scenes)
+
+        self.create_input_fields(input_window, num_entities)
+
+    def create_input_fields(self, input_window, num_entities):
+        for widget in input_window.winfo_children():
+            widget.destroy()
+
+        label = tk.Label(input_window, text="Enter Cluster Sizes:")
+        label.pack(pady=10)
+
+        entity_entries = []
+
+        if num_entities == 0:
+            entry_label = tk.Label(input_window, text=f"Scene {1}:")
+            entry_label.pack()
+            entry = tk.Entry(input_window)
+            entry.pack(pady=5)
+            entity_entries.append(entry)
+        else:
+            for i in range(num_entities):
+                entry_label = tk.Label(input_window, text=f"Scene {i + 1}:")
+                entry_label.pack()
+                entry = tk.Entry(input_window)
+                entry.pack(pady=5)
+                entity_entries.append(entry)
+
+        submit_button = tk.Button(input_window, text="Submit",
+                                  command=lambda: self.submit_entities(input_window, entity_entries))
+        submit_button.pack(pady=10)
+
+    def submit_entities(self, input_window, entity_entries):
+        cluster_list = []
+        for entry in entity_entries:
+            try:
+                entity_value = int(entry.get())
+                cluster_list.append(entity_value)
+            except ValueError:
+                messagebox.showerror("Error", "Please enter valid cluster sizes")
+                return
+
+        self.comic.match_entities(cluster_list)
+
+        self.display_images()
+
+        input_window.destroy()
+
     def create_interactive_buttons(self, width_scale, height_scale):
         for button in self.buttons:
             button.destroy()
@@ -254,28 +306,63 @@ class ComicDisplayPage:
 
     def create_buttons_for_page(self, page, frame, width_scale, height_scale):
         for panel in page.panels:
-            button = tk.Button(frame,bg='white',text=panel.description,font=fnt.Font(size=6),borderwidth=0, highlightthickness= 0,
-                               command = lambda e=panel: self.on_panel_click(e))
-            bbox = panel.bounding_box
-            x = int(bbox['x'] - bbox['width'] / 2) * width_scale
-            y = int(bbox['y'] - bbox['height'] / 2) * height_scale
-            w = int(bbox['width']) * width_scale
-            h = int(bbox['height']) * height_scale
-            button.place(x=(w-x)/2, y=(h-y)/2, width=(w-x)/10, height=(h-y)/10)
-            self.buttons.append(button)
+            if self.show_panels:
+                bbox = panel.bounding_box
 
-            for speech_bubble in panel.speech_bubbles:
-                bbox = speech_bubble.bounding_box
-                x = int(bbox['x'] - bbox['width'] / 2) * width_scale
-                y = int(bbox['y'] - bbox['height'] / 2) * height_scale
-                w = int(bbox['width']) * width_scale
-                h = int(bbox['height']) * height_scale
+                center_x = bbox['x'] * width_scale
+                center_y = bbox['y'] * height_scale
 
-                button = tk.Button(frame, bg="white", text=speech_bubble.text, font = fnt.Font(size = 6),borderwidth=0, highlightthickness=0,
-                                   command=lambda e=speech_bubble: self.on_speech_bubble_click(e))
+                w = (bbox['width'] * width_scale)/10
+                h = (bbox['height'] * height_scale)/10
 
-                button.place(x=x, y=y, width=w, height=h)
+                button_x = center_x - (w / 2)
+                button_y = center_y - (h / 2)
+
+                borderwidth = 0
+
+                if panel.starting_tag:
+                    borderwidth = w/10
+
+                button = tk.Button(
+                    frame,
+                    bg='green',
+                    text=panel.description,
+                    font=fnt.Font(size=6),
+                    borderwidth=borderwidth,
+                    highlightthickness=0,
+                    command=lambda e=panel: self.on_panel_click(e)
+                )
+
+                button.place(x=button_x, y=button_y, width=w, height=h)
+
+                button.bind("<Button-3>", lambda event, e=panel: self.on_panel_right_click(e))
+
                 self.buttons.append(button)
+
+            if self.show_speech_bubbles:
+                for speech_bubble in panel.speech_bubbles:
+                    bbox = speech_bubble.bounding_box
+
+                    center_x = bbox['x'] * width_scale
+                    center_y = bbox['y'] * height_scale
+                    w = bbox['width'] * width_scale
+                    h = bbox['height'] * height_scale
+
+                    button = tk.Button(
+                        frame,
+                        bg="red",
+                        text=speech_bubble.text,
+                        font=fnt.Font(size=6),
+                        borderwidth=0,
+                        highlightthickness=0,
+                        command=lambda e=speech_bubble: self.on_speech_bubble_click(e)
+                    )
+
+                    button_x = center_x - (w / 2)
+                    button_y = center_y - (h / 2)
+
+                    button.place(x=button_x, y=button_y, width=w, height=h)
+                    self.buttons.append(button)
 
     #TODO: refactor with speechbubble
     def on_panel_click(self,panel):
@@ -332,3 +419,9 @@ class ComicDisplayPage:
         mixer.quit()
         if os.path.isfile(outfile):
             os.remove(outfile)
+
+    # TODO: Add more efficent scene algorithm
+    def on_panel_right_click(self, panel):
+        panel.starting_tag = not panel.starting_tag
+        self.comic.update_scenes()
+        self.display_images()

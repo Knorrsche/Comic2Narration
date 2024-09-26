@@ -1,4 +1,6 @@
+import base64
 import logging
+import os
 import threading
 from typing import Optional, List
 from Classes.Panel import Panel
@@ -8,10 +10,13 @@ from Classes.Series import Series
 from Classes.Entity import Entity
 from Utils import ImageUtils as iu
 from inference_sdk import InferenceHTTPClient
+from gradio_client import Client, handle_file
 import ollama
+import tempfile
 from PIL import Image
 import io
 import cv2
+import numpy as np
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -24,7 +29,6 @@ class ComicPreprocessor:
     current_comic: Comic
     export_path: str
 
-
     str_general_instuction = ('GENERAL INSTRUCTIONS:\n'
                               '    You are a expert in Comic summarization. Your task is to describe what is happening in an image of a comic panel.\n'
                               '    You will also get context in form of text from speech bubbles, but you are not allowed to return the words from the speech bubbles.\n'
@@ -36,8 +40,6 @@ class ComicPreprocessor:
                               '    Example: A shadow is fighting against a Robot at night. A police officer is helping.\n'
                               '    \n'
                               )
-
-
 
     def __init__(self, name: str, volume: int, main_series: Series, secondary_series: Optional[List[Series]],
                  rgb_arrays):
@@ -62,14 +64,17 @@ class ComicPreprocessor:
 
             if i == 0:
                 first_page = None
-                second_page = Page(page_image=rgb_array, page_index=i, page_type=self.classify_page(), height=height, width=width)
+                second_page = Page(page_image=rgb_array, page_index=i, page_type=self.classify_page(), height=height,
+                                   width=width)
             else:
-                first_page = Page(page_image=rgb_array, page_index=i, page_type=self.classify_page(), height=height, width=width)
+                first_page = Page(page_image=rgb_array, page_index=i, page_type=self.classify_page(), height=height,
+                                  width=width)
 
                 if i + 1 < len(rgb_arrays):
                     rgb_array_next = rgb_arrays[i + 1]
                     height_next, width_next, _ = rgb_array_next.shape
-                    second_page = Page(page_image=rgb_array_next, page_index=i + 1, page_type=self.classify_page(), height=height_next, width=width_next)
+                    second_page = Page(page_image=rgb_array_next, page_index=i + 1, page_type=self.classify_page(),
+                                       height=height_next, width=width_next)
                     i += 1
                 else:
                     second_page = None
@@ -85,7 +90,7 @@ class ComicPreprocessor:
         return PageType.SINGLE
 
     # TODO: Image Descriptor
-    def describe_image(self,image):
+    def describe_image(self, image):
 
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(image_rgb)
@@ -143,21 +148,19 @@ class ComicPreprocessor:
             threads = []
             logging.debug('\n')
 
-
-    def handle_improve_panels_page(self,page):
+    def handle_improve_panels_page(self, page):
         panels = page.panels
         str_page_context = 'This is the context of the whole Page. Use this to improve the description of the Current Panel. \n'
         # Make page get transcript function
-        for i,panel in enumerate(panels):
+        for i, panel in enumerate(panels):
             str_page_context += f'Panel {i + 1} Description: {panel.description}\n'
             #str_page_context += f'Panel {i + 1} Speech Bubbles: {panel.get_transcript}\n'
 
-        for i,panel in enumerate(panels):
+        for i, panel in enumerate(panels):
             str_context = ''
             str_context += str_page_context
-            str_context += f'Current Panel {i+1} Description: {panel.description}\n'
+            str_context += f'Current Panel {i + 1} Description: {panel.description}\n'
             #str_context += f'Current Panel {i+1} Speech Bubbles: {panel.get_transcript}\n'
-
 
             image_rgb = cv2.cvtColor(panel.image, cv2.COLOR_BGR2RGB)
             pil_image = Image.fromarray(image_rgb)
@@ -181,18 +184,17 @@ class ComicPreprocessor:
             panel.descriptions.append(description)
             panel.description = description
 
-
-    def handle_improve_panels_neighbors(self,page):
+    def handle_improve_panels_neighbors(self, page):
         panels = page.panels
-        for i,panel in enumerate(panels):
+        for i, panel in enumerate(panels):
             str_context = ''
             current_panel = panel
             if i != 0:
-                previous_panel = panels[i-1]
+                previous_panel = panels[i - 1]
                 str_context += f'Previous Panel Description: {previous_panel.description}\n'
                 #str_context += f'Previous Panel Speech Bubbles: {previous_panel.get_transcript}\n'
             if i != len(panels) - 1:
-                next_panel = panels[i+1]
+                next_panel = panels[i + 1]
                 str_context += f'Next Panel Description: {next_panel.description}\n'
                 #str_context += f'Next Panel Speech Bubbles: {next_panel.get_transcript}\n'
             str_context += f'Current Panel Description: {current_panel.description}\n'
@@ -220,7 +222,7 @@ class ComicPreprocessor:
             panel.descriptions.append(description)
             panel.description = description
 
-
+    # TODO find way for threading
     def create_tags(self):
         threads = []
 
@@ -229,62 +231,38 @@ class ComicPreprocessor:
                 if not page:
                     continue
 
-                thread = threading.Thread(target=self.handle_create_tags, args=(page,))
-                threads.append(thread)
                 logging.debug(f'Starting Tag creation thread for page {page.page_index}')
-                thread.start()
-
-            for thread in threads:
-                thread.join()
-                logging.debug(f'Threads for Tag creation with neighbors of page_pair {i} finished')
-            threads = []
+                self.handle_create_tags(page)
             logging.debug('\n')
 
-    def handle_create_tags(self,page):
-        panels = page.panels
-        for panel in panels:
+    def handle_create_tags(self, page):
+        client = Client("SmilingWolf/wd-tagger")
+
+        for panel in page.panels:
             for entity in panel.entities:
-                entity.image = iu.image_from_bbox(panel.image, entity.bounding_box)
-                if entity.image is None:
-                    continue
-                image_rgb = cv2.cvtColor(entity.image, cv2.COLOR_BGR2RGB)
-                pil_image = Image.fromarray(image_rgb)
+                pil_image = Image.fromarray(entity.image)
 
-                image_bytes = io.BytesIO()
-                pil_image.save(image_bytes, format='PNG')
-                image_bytes = image_bytes.getvalue()
+                pil_image.save('tmp.jpg')
+                image_input = handle_file('tmp.jpg')
 
-                message = {
-                    'role': 'user',
-                    'content': 'Describe the Character and Background visually. Explain descriptive what you see in this image in context that you already know this is an image of a comic character in a scene. '
-                               'Answer with details like hairstyle, haircolor, gender, clother but also about the background like place, job, activity.',
-                    'images': [image_bytes]
-                }
+                result = client.predict(
+                        image=image_input,
+                        model_repo="SmilingWolf/wd-swinv2-tagger-v3",
+                        general_thresh=0.1,
+                        general_mcut_enabled=False,
+                        character_thresh=0.85,
+                        character_mcut_enabled=False,
+                        api_name="/predict"
+                    )
 
-                res = ollama.chat(
-                    model='llava',
-                    messages=[message]
-                )
+                confidences = result[3]['confidences']
+                tag_confidence_tuples = [(item['label'], item['confidence']) for item in confidences]
 
-                description = res['message']['content']
+                entity.tags = tag_confidence_tuples
 
-                print(description)
+                # TODO: add to .env as name
+                os.remove('tmp.jpg')
 
-                message = {
-                    'role': 'user',
-                    'content': f'Given this Description: {description} - You are an image tag converter for comics characters. Convert this description to a list of tags like this with the delmimter ";"  Woman;Blonde;Dress;Night;Store and only answer with these Tags.',
-                }
-
-                res = ollama.chat(
-                    model='llama3',
-                    messages=[message]
-                )
-                response = res['message']['content'].replace(".*:","")
-                print(response)
-                tags = response.split(';')
-                for tag in tags:
-                    tag = tag.strip()
-                entity.tags = tags
 
     #TODO: Refactor with extract_speech_bubbles
     def detect_panels(self):
@@ -327,8 +305,8 @@ class ComicPreprocessor:
             panel.descriptions.append(panel.description)
             panels.append(panel)
 
-        panels = sorted(panels, key=lambda p: ( (p.bounding_box['y']-p.bounding_box['height']/2),
-                                                (p.bounding_box['x'])-p.bounding_box['width']/2))
+        panels = sorted(panels, key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height'] / 2),
+                                               (p.bounding_box['x']) - p.bounding_box['width'] / 2))
         page.panels = panels
 
     def detect_entities(self):
@@ -350,7 +328,7 @@ class ComicPreprocessor:
             threads = []
             logging.debug('\n')
 
-    def handel_detect_entity(self,page:Page):
+    def handel_detect_entity(self, page: Page):
 
         CLIENT = InferenceHTTPClient(
             api_url="https://detect.roboflow.com",
@@ -361,11 +339,11 @@ class ComicPreprocessor:
         entities = []
 
         for entity_data in result_entities['predictions']:
-            if entity_data['confidence'] <0:
+            if entity_data['confidence'] < 0:
                 continue
 
-            entitiy_image = iu.image_from_bbox(page.page_image, entity_data)
             entity = Entity(entity_data)
+            entity.image = iu.image_from_bbox(page.page_image, entity_data)
             entities.append(entity)
 
             for panel in page.panels:
@@ -375,6 +353,7 @@ class ComicPreprocessor:
         for panel in page.panels:
             entities = panel.entities
             panel.entities = sorted(entities,
-                                          key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height'] / 2),
-                                                         (p.bounding_box['x']) - p.bounding_box['width'] / 2))
+                                    key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height'] / 2),
+                                                   (p.bounding_box['x']) - p.bounding_box['width'] / 2))
+
 

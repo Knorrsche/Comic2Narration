@@ -1,5 +1,8 @@
 from enum import Enum
 from typing import List,Optional
+
+from PIL import ImageDraw, ImageFont,Image
+
 from .Panel import Panel
 from Utils import ImageUtils as iU
 import xml.etree.ElementTree as eT
@@ -38,13 +41,13 @@ class Page:
 
         for panel in self.panels:
             new_image = iU.draw_bounding_box(
-                new_image, panel.bounding_box, self.bbox_color_panel, self.bbox_thickness_panel
+                new_image, panel.bounding_box, self.bbox_color_panel, self.bbox_thickness_panel, panel.scene_id
             ) if draw_panels is True else new_image
 
             for entity in panel.entities:
                 new_image = iU.draw_bounding_box(
-                    new_image,entity.bounding_box,self.bbox_color_entity,self.bbox_thickness_entity
-                ) if draw_entities is True else new_image
+                    new_image,entity.bounding_box,self.bbox_color_entity,self.bbox_thickness_entity,
+                entity.named_entity_id) if draw_entities is True else new_image
 
             if not draw_speech_bubbles:
                 continue
@@ -52,7 +55,7 @@ class Page:
             for speech_bubble in panel.speech_bubbles:
                 new_image = iU.draw_bounding_box(
                     new_image, speech_bubble.bounding_box, self.bbox_color_speech_bubble,
-                    self.bbox_thickness_speech_bubble
+                    self.bbox_thickness_speech_bubble,speech_bubble.speaker_id
                 )
 
         return new_image
