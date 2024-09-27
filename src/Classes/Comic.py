@@ -1,14 +1,17 @@
+import math
+from collections import defaultdict
+
+from gensim.models import Word2Vec, KeyedVectors
+from sklearn.mixture import GaussianMixture
+
 from .Series import Series
 from .Page import Page
 from typing import Optional, List
 import xml.etree.ElementTree as eT
-from gensim.downloader import api
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-
-
+from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import MultiLabelBinarizer, normalize
-from sklearn.cluster import KMeans, AgglomerativeClustering, SpectralClustering, AffinityPropagation, Birch
+from sklearn.cluster import KMeans, AgglomerativeClustering, SpectralClustering, AffinityPropagation, Birch, DBSCAN
 
 
 class Comic:
@@ -20,7 +23,6 @@ class Comic:
         self.secondary_series = secondary_series
         self.page_pairs = page_pairs
         self.scenes = []
-        self.word2vec_model = api.load('word2vec-google-news-300')
 
     def to_narrative(self) -> str:
         script = ''
@@ -70,29 +72,75 @@ class Comic:
 
         return element
 
-    # TODO: Change to extern file later
-    # add option to enter from - to for panels for the scene
-    # and add a cluster input field
     def match_entities(self, clusters_list):
-        character_tags = []
-        entities = []
+        w2v_model = KeyedVectors.load_word2vec_format(r'C:\Users\derra\Downloads\GoogleNews-vectors-negative300.bin',
+                                                      binary=True)
+
         for counter, scene in enumerate(self.scenes):
+            entities = []
+            tf_idf = self.calculate_tf_idf(scene)
+
+            entity_tags = []
             for panel in scene:
                 for entity in panel.entities:
-                    if entity.tags:
-                        tags = [item[0] for item in entity.tags]
-                        character_tags.append(tags)
-                        entities.append(entity)
+                    entities.append(entity)
+                    entity_tags.append([tag_[0] for tag_ in entity.tags])
 
-            mlb_char_tags = MultiLabelBinarizer()
-            character_tag_features = mlb_char_tags.fit_transform(character_tags)
-            normalized_character_tag_features = normalize(character_tag_features)
-            clustering_algorithm = Birch(n_clusters=clusters_list[counter])
-            clusters = clustering_algorithm.fit_predict(normalized_character_tag_features)
-            for int_, cluster in enumerate(clusters):
-                entities[int_].named_entity_id = clusters[int_]
-            character_tags = []
-            entities = []
+            mlb = MultiLabelBinarizer()
+            one_hot_encoded_tags = mlb.fit_transform(entity_tags)
+
+            tf_idf_vector = np.array([tf_idf.get(tag, 0) for tag in mlb.classes_])
+
+            word2vec_matrix = np.zeros((len(entity_tags), 300))
+            for i, tags in enumerate(entity_tags):
+                valid_vectors = [w2v_model[tag] for tag in tags if tag in w2v_model]
+                word2vec_matrix[i] = np.mean(valid_vectors, axis=0) if valid_vectors else np.zeros(300)
+
+            valid_tags = mlb.classes_
+            valid_indices = [i for i, tag in enumerate(valid_tags) if tag in w2v_model]
+
+            valid_tf_idf_vector = tf_idf_vector[valid_indices]
+            valid_word2vec_matrix = word2vec_matrix[:, valid_indices]
+
+            tf_idf_scaled_word2vec = valid_word2vec_matrix * valid_tf_idf_vector[np.newaxis, :]  # Correct broadcasting
+
+            data_matrices = {
+                'One-Hot Encoding': one_hot_encoded_tags,
+                'TF-IDF-scaled One-Hot': one_hot_encoded_tags * tf_idf_vector,  # Ensure this matches the correct shape
+                'Word2Vec': word2vec_matrix,
+                'TF-IDF-scaled Word2Vec': tf_idf_scaled_word2vec
+            }
+
+            if not any(matrix.size for matrix in data_matrices.values()):
+                print(f"No features found for scene {counter}")
+                continue
+
+            print(f"\nScene {counter} - Running multiple clustering algorithms and encodings:")
+
+            algorithms = {
+                'KMeans': KMeans(n_clusters=clusters_list[counter]),
+                'DBSCAN': DBSCAN(eps=0.5, min_samples=5),
+                'Agglomerative': AgglomerativeClustering(n_clusters=clusters_list[counter]),
+                'Gaussian Mixture': GaussianMixture(n_components=clusters_list[counter]),
+                'Birch': Birch(n_clusters=clusters_list[counter])
+            }
+
+            for matrix_name, matrix in data_matrices.items():
+                if matrix.size == 0:
+                    continue
+
+                print(f"\nUsing {matrix_name} with shape {matrix.shape}:")
+
+                for algo_name, algorithm in algorithms.items():
+                    try:
+                        clusters = algorithm.fit_predict(matrix)
+                        print(f"{algo_name} Clustering Results: {clusters}")
+
+                        for int_, cluster in enumerate(clusters):
+                            entities[int_].named_entity_id = cluster
+
+                    except Exception as e:
+                        print(f"Error running {algo_name} on {matrix_name}: {e}")
 
     #TODO can be more efficent
     def update_scenes(self):
@@ -123,5 +171,41 @@ class Comic:
             scenes.append(current_scene)
         self.scenes = scenes
 
-    def calculate_inv_idf(self):
-        inter = 2
+    def calculate_tf(self, scene):
+        tag_frequency = defaultdict(int)
+        total_tags = 0
+        for panel in scene:
+            for entity in panel.entities:
+                for tag_ in entity.tags:
+                    tag = tag_[0]
+                    tag_frequency[tag] += 1
+                    total_tags += 1
+        if total_tags == 0:
+            return {}
+        tf = {tag: count / total_tags for tag, count in tag_frequency.items()}
+
+        return tag_frequency, tf
+
+    def calculate_idf(self, scene):
+        tag_document_count = defaultdict(int)
+        total_scenes = len(scene)
+
+        for panel in scene:
+            unique_tags = set()
+            for entity in panel.entities:
+                for tag_ in entity.tags:
+                    unique_tags.add(tag_[0])
+
+            for tag in unique_tags:
+                tag_document_count[tag] += 1
+
+        idf = {tag: math.log(total_scenes / (1 + count)) for tag, count in tag_document_count.items()}
+        return idf
+
+    def calculate_tf_idf(self,scenes):
+        tf = self.calculate_tf(scenes)
+        idf = self.calculate_idf(scenes)
+
+        tf_idf = {tag: tf_val * idf.get(tag,0) for tag,tf_val in tf[1].items()}
+        return tf_idf
+

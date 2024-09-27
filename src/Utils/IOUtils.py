@@ -134,8 +134,12 @@ def parse_bounding_box(bbox_str):
         key_value_pair = part.split(':')
         key = key_value_pair[0]
         value = ':'.join(key_value_pair[1:])
+
         if key in ['x', 'y', 'width', 'height', 'confidence']:
-            bbox_dict[key] = float(value)
+            try:
+                bbox_dict[key] = float(value) if value else 0.0
+            except ValueError as e:
+                raise ValueError(f"Invalid value for {key}: {value}") from e
         else:
             bbox_dict[key] = value
 
@@ -143,23 +147,33 @@ def parse_bounding_box(bbox_str):
 
 
 def parse_speech_bubble(sb_elem):
-    return SpeechBubble(
+    speech_bubble = SpeechBubble(
         type=SpeechBubbleType[sb_elem.find('Type').text.upper()],
         text=escape_text(sb_elem.find('Text').text, reverse=True),
         bounding_box=parse_bounding_box(sb_elem.find('BoundingBox').text)
     )
+    speech_bubble.speaker_id = int(sb_elem.find('Speaker_Id').text)
+    return speech_bubble
 
 
 def parase_entities(en_elem):
     entity = Entity(
         bounding_box=parse_bounding_box(en_elem.find('BoundingBox').text),
     )
-    entity.named_entity_id = escape_text(en_elem.find('Named_Entity_Id').text)
-    entity.tags = parse_tags(en_elem.find('Tags').text)
+    entity.named_entity_id = int(escape_text(en_elem.find('Named_Entity_Id').text))
+    entity.tags = parse_tags(en_elem.find('Tags'))
     return entity
 
 def parse_tags(en_elem):
-    int = 2
+    tags = en_elem.findall('Tag')
+    tag_list = []
+
+    for tag in tags:
+        label = tag.find('Label').text
+        value = float(tag.find('Value').text)
+        tag_list.append((label, value))
+
+    return tag_list
 
 def parse_panel(panel_elem):
     speech_bubbles = [parse_speech_bubble(sb) for sb in panel_elem.find('SpeechBubbles')]
@@ -169,6 +183,8 @@ def parse_panel(panel_elem):
         bounding_box=parse_bounding_box(panel_elem.find('BoundingBox').text),
         speech_bubbles=speech_bubbles,
     )
+    panel.scene_id = int(panel_elem.find('Scene_Id').text)
+    panel.starting_tag = str_to_bool(panel_elem.find('Starting_Tag').text)
     panel.entities = entities
     return panel
 
@@ -206,7 +222,14 @@ def parse_comic(xml_content):
     page_pairs = [parse_page_pair(pp) for pp in root.find('PagePairs')]
 
     return Comic(name, volume, main_series, secondary_series, page_pairs)
-
+def str_to_bool(s):
+    if isinstance(s, str):
+        s = s.strip().lower()
+        if s == 'true':
+            return True
+        elif s == 'false':
+            return False
+    raise ValueError(f"Cannot convert {s} to boolean")
 
 def add_image_data(comic: Comic, file_path: str):
     pages = convert_pdf_to_image(file_path)

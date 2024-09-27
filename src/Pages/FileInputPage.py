@@ -96,6 +96,7 @@ class FileInputPage:
                 embedded_xml = read_xml_from_pdf(self.file_path)
                 imported_comic = parse_comic(embedded_xml)
                 add_image_data(imported_comic,self.file_path)
+                imported_comic.update_scenes()
                 self.parent.show_comic_display_screen(imported_comic,self.file_path)
             except Exception as e:
                 e.with_traceback()

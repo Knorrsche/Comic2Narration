@@ -248,7 +248,7 @@ class ComicPreprocessor:
                 result = client.predict(
                         image=image_input,
                         model_repo="SmilingWolf/wd-swinv2-tagger-v3",
-                        general_thresh=0.1,
+                        general_thresh=0.5,
                         general_mcut_enabled=False,
                         character_thresh=0.85,
                         character_mcut_enabled=False,
