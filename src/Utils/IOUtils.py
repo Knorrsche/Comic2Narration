@@ -246,6 +246,8 @@ def add_image_data(comic: Comic, file_path: str):
 
                 for speech_bubble in panel.speech_bubbles:
                     speech_bubble.image = image_from_bbox(left_page.page_image, speech_bubble.bounding_box)
+                for entity in panel.entities:
+                    entity.image = image_from_bbox(left_page.page_image, entity.bounding_box)
             counter += 1
 
         if right_page is not None:
@@ -255,4 +257,7 @@ def add_image_data(comic: Comic, file_path: str):
 
                 for speech_bubble in panel.speech_bubbles:
                     speech_bubble.image = image_from_bbox(right_page.page_image, speech_bubble.bounding_box)
+                for entity in panel.entities:
+                    entity.image = image_from_bbox(right_page.page_image, entity.bounding_box)
             counter += 1
+

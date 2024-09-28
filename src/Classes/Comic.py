@@ -72,50 +72,98 @@ class Comic:
 
         return element
 
-    def match_entities(self, clusters_list):
-        w2v_model = KeyedVectors.load_word2vec_format(r'C:\Users\derra\Downloads\GoogleNews-vectors-negative300.bin',
-                                                      binary=True)
+    #TODO: Add temp saving of word2vec to not need to recalculate every time
+    def match_entities(self, clusters_list, algorithm='Birch', input_type='One-Hot Encoding', confidence=0.1,
+                       debug=False):
+        """
+        Match entities into clusters based on various clustering algorithms and feature encodings.
+
+        Parameters:
+        -----------
+        clusters_list : list
+            A list containing the number of clusters for each scene.
+        algorithm : str, optional
+            The clustering algorithm to be used. Choices are ['KMeans', 'DBSCAN', 'Agglomerative', 'Gaussian Mixture', 'Birch'].
+            Default is 'Birch'.
+        input_type : str, optional
+            The data encoding type to be used. Choices are ['One-Hot Encoding', 'TF-IDF-scaled One-Hot', 'Word2Vec', 'TF-IDF-scaled Word2Vec'].
+            Default is 'One-Hot Encoding'.
+        confidence : float, optional
+            Minimum confidence level required for tags to be considered in clustering. Default is 0.1.
+        debug : bool, optional
+            Whether to print the clusters. Default is False.
+
+        Returns:
+        --------
+        None
+        """
+        w2v_model = None
+        if input_type in ['Word2Vec', 'TF-IDF-scaled Word2Vec']:
+            w2v_model = KeyedVectors.load_word2vec_format(
+                r'C:\Users\derra\Downloads\GoogleNews-vectors-negative300.bin', binary=True)
 
         for counter, scene in enumerate(self.scenes):
             entities = []
-            tf_idf = self.calculate_tf_idf(scene)
-
+            tf_idf = None
             entity_tags = []
+
             for panel in scene:
                 for entity in panel.entities:
                     entities.append(entity)
-                    entity_tags.append([tag_[0] for tag_ in entity.tags])
+                    filtered_tags = [tag[0] for tag in entity.tags if tag[1] >= confidence]
+                    entity_tags.append(filtered_tags)
 
-            mlb = MultiLabelBinarizer()
-            one_hot_encoded_tags = mlb.fit_transform(entity_tags)
+            mlb = None
+            one_hot_encoded_tags = None
+            if input_type in ['One-Hot Encoding', 'TF-IDF-scaled One-Hot', 'TF-IDF-scaled Word2Vec']:
+                mlb = MultiLabelBinarizer()
+                one_hot_encoded_tags = mlb.fit_transform([tag[0] for tags in entity_tags for tag in tags])
 
-            tf_idf_vector = np.array([tf_idf.get(tag, 0) for tag in mlb.classes_])
+            tf_idf_vector = None
+            if input_type in ['TF-IDF-scaled One-Hot', 'TF-IDF-scaled Word2Vec']:
+                tf_idf = self.calculate_tf_idf(scene)
+                if input_type == 'TF-IDF-scaled One-Hot' and mlb:
+                    tf_idf_vector = np.array([tf_idf.get(tag, 0) for tag in mlb.classes_])
 
-            word2vec_matrix = np.zeros((len(entity_tags), 300))
-            for i, tags in enumerate(entity_tags):
-                valid_vectors = [w2v_model[tag] for tag in tags if tag in w2v_model]
-                word2vec_matrix[i] = np.mean(valid_vectors, axis=0) if valid_vectors else np.zeros(300)
+            word2vec_matrix = None
+            if input_type in ['Word2Vec', 'TF-IDF-scaled Word2Vec']:
+                word2vec_matrix = np.zeros((len(entity_tags), 300))
+                for i, tags in enumerate(entity_tags):
+                    valid_vectors = [w2v_model[tag[0]] for tag in tags if tag[0] in w2v_model]
+                    word2vec_matrix[i] = np.mean(valid_vectors, axis=0) if valid_vectors else np.zeros(300)
 
-            valid_tags = mlb.classes_
-            valid_indices = [i for i, tag in enumerate(valid_tags) if tag in w2v_model]
+            data_matrix = None
+            if input_type == 'One-Hot Encoding':
+                data_matrix = one_hot_encoded_tags
+            elif input_type == 'TF-IDF-scaled One-Hot':
+                if tf_idf_vector is not None:
+                    data_matrix = one_hot_encoded_tags * tf_idf_vector
+            elif input_type == 'Word2Vec':
+                data_matrix = word2vec_matrix
+            elif input_type == 'TF-IDF-scaled Word2Vec':
+                valid_indices = []
+                valid_tf_idf_vector = None
 
-            valid_tf_idf_vector = tf_idf_vector[valid_indices]
-            valid_word2vec_matrix = word2vec_matrix[:, valid_indices]
+                if mlb and tf_idf_vector is not None:
+                    valid_tags = mlb.classes_
+                    valid_indices = [i for i, tag in enumerate(valid_tags) if tag in w2v_model]
+                    valid_tf_idf_vector = tf_idf_vector[valid_indices]
 
-            tf_idf_scaled_word2vec = valid_word2vec_matrix * valid_tf_idf_vector[np.newaxis, :]  # Correct broadcasting
+                if valid_tf_idf_vector is not None:
+                    valid_word2vec_matrix = word2vec_matrix[:, valid_indices]
+                    data_matrix = valid_word2vec_matrix * valid_tf_idf_vector[np.newaxis, :]
 
-            data_matrices = {
-                'One-Hot Encoding': one_hot_encoded_tags,
-                'TF-IDF-scaled One-Hot': one_hot_encoded_tags * tf_idf_vector,  # Ensure this matches the correct shape
-                'Word2Vec': word2vec_matrix,
-                'TF-IDF-scaled Word2Vec': tf_idf_scaled_word2vec
-            }
-
-            if not any(matrix.size for matrix in data_matrices.values()):
-                print(f"No features found for scene {counter}")
+            if data_matrix is None or data_matrix.size == 0:
+                if debug:
+                    print(f"No features found for scene {counter} using {input_type}")
+                    print(f"one_hot_encoded_tags: {one_hot_encoded_tags}")
+                    print(f"tf_idf_vector: {tf_idf_vector}")
+                    print(f"word2vec_matrix: {word2vec_matrix}")
+                    print(f"data_matrix: {data_matrix}")
                 continue
 
-            print(f"\nScene {counter} - Running multiple clustering algorithms and encodings:")
+            if debug:
+                print(f"\nScene {counter} - Using {input_type} with shape {data_matrix.shape}:")
 
             algorithms = {
                 'KMeans': KMeans(n_clusters=clusters_list[counter]),
@@ -125,22 +173,24 @@ class Comic:
                 'Birch': Birch(n_clusters=clusters_list[counter])
             }
 
-            for matrix_name, matrix in data_matrices.items():
-                if matrix.size == 0:
-                    continue
+            if algorithm not in algorithms:
+                if debug:
+                    print(f"Invalid algorithm '{algorithm}' specified.")
+                continue
 
-                print(f"\nUsing {matrix_name} with shape {matrix.shape}:")
+            selected_algorithm = algorithms[algorithm]
 
-                for algo_name, algorithm in algorithms.items():
-                    try:
-                        clusters = algorithm.fit_predict(matrix)
-                        print(f"{algo_name} Clustering Results: {clusters}")
+            try:
+                clusters = selected_algorithm.fit_predict(data_matrix)
+                if debug:
+                    print(f"{algorithm} Clustering Results: {clusters}")
 
-                        for int_, cluster in enumerate(clusters):
-                            entities[int_].named_entity_id = cluster
+                for int_, cluster in enumerate(clusters):
+                    entities[int_].named_entity_id = cluster
 
-                    except Exception as e:
-                        print(f"Error running {algo_name} on {matrix_name}: {e}")
+            except Exception as e:
+                if debug:
+                    print(f"Error running {algorithm} on {input_type}: {e}")
 
     #TODO can be more efficent
     def update_scenes(self):

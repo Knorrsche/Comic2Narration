@@ -242,7 +242,7 @@ class ComicDisplayPage:
 
     def match_entities(self):
         input_window = tk.Toplevel(self.parent.root)
-        input_window.title("Input Cluster Sizes")
+        input_window.title("Input Cluster Sizes and Options")
 
         num_entities = len(self.comic.scenes)
 
@@ -256,7 +256,6 @@ class ComicDisplayPage:
         label.pack(pady=10)
 
         entity_entries = []
-
         if num_entities == 0:
             entry_label = tk.Label(input_window, text=f"Scene {1}:")
             entry_label.pack()
@@ -271,11 +270,34 @@ class ComicDisplayPage:
                 entry.pack(pady=5)
                 entity_entries.append(entry)
 
+        confidence_label = tk.Label(input_window, text="Enter Confidence Limit (0-1):")
+        confidence_label.pack(pady=10)
+        confidence_entry = tk.Entry(input_window)
+        confidence_entry.pack(pady=5)
+
+        algorithm_label = tk.Label(input_window, text="Select Clustering Algorithm:")
+        algorithm_label.pack(pady=10)
+
+        algorithm_options = ['KMeans', 'DBSCAN', 'Agglomerative', 'Gaussian Mixture', 'Birch']
+        algorithm_var = tk.StringVar(input_window)
+        algorithm_var.set(algorithm_options[0])
+        algorithm_menu = tk.OptionMenu(input_window, algorithm_var, *algorithm_options)
+        algorithm_menu.pack(pady=5)
+
+        input_type_label = tk.Label(input_window, text="Select Input Encoding Type:")
+        input_type_label.pack(pady=10)
+
+        input_type_options = ['One-Hot Encoding', 'TF-IDF-scaled One-Hot', 'Word2Vec', 'TF-IDF-scaled Word2Vec']
+        input_type_var = tk.StringVar(input_window)
+        input_type_var.set(input_type_options[0])
+        input_type_menu = tk.OptionMenu(input_window, input_type_var, *input_type_options)
+        input_type_menu.pack(pady=5)
+
         submit_button = tk.Button(input_window, text="Submit",
-                                  command=lambda: self.submit_entities(input_window, entity_entries))
+                                  command=lambda: self.submit_entities(input_window, entity_entries, algorithm_var, input_type_var, confidence_entry))
         submit_button.pack(pady=10)
 
-    def submit_entities(self, input_window, entity_entries):
+    def submit_entities(self, input_window, entity_entries, algorithm_var, input_type_var, confidence_entry):
         cluster_list = []
         for entry in entity_entries:
             try:
@@ -285,7 +307,18 @@ class ComicDisplayPage:
                 messagebox.showerror("Error", "Please enter valid cluster sizes")
                 return
 
-        self.comic.match_entities(cluster_list)
+        algorithm = algorithm_var.get()
+        input_type = input_type_var.get()
+
+        try:
+            confidence_value = float(confidence_entry.get())
+            if confidence_value < 0 or confidence_value > 1:
+                raise ValueError("Confidence limit must be between 0 and 1.")
+        except ValueError as ve:
+            messagebox.showerror("Error", str(ve))
+            return
+
+        self.comic.match_entities(cluster_list, algorithm=algorithm, input_type=input_type, confidence=confidence_value, debug=True)
 
         self.display_images()
 
@@ -364,6 +397,31 @@ class ComicDisplayPage:
                     button.place(x=button_x, y=button_y, width=w, height=h)
                     self.buttons.append(button)
 
+            if self.show_entities:
+                for entity in panel.entities:
+                    bbox = entity.bounding_box
+
+                    center_x = bbox['x'] * width_scale
+                    center_y = bbox['y'] * height_scale
+                    w = bbox['width'] * width_scale
+                    h = bbox['height'] * height_scale
+
+                    button = tk.Button(
+                        frame,
+                        bg="blue",
+                        text=speech_bubble.text,
+                        font=fnt.Font(size=6),
+                        borderwidth=0,
+                        highlightthickness=0,
+                        command=lambda e=entity: self.on_entity_click(e)
+                    )
+
+                    button_x = center_x - (w / 2)
+                    button_y = center_y - (h / 2)
+
+                    button.place(x=button_x, y=button_y, width=w, height=h)
+                    self.buttons.append(button)
+
     #TODO: refactor with speechbubble
     def on_panel_click(self,panel):
         text = panel.description
@@ -425,3 +483,51 @@ class ComicDisplayPage:
         panel.starting_tag = not panel.starting_tag
         self.comic.update_scenes()
         self.display_images()
+
+    #TODO: show matching tags with other entities in scene or show counter of tag in scene entities
+    def on_entity_click(self, entity):
+        tags_window = tk.Toplevel(self.parent.root)
+        tags_window.title("Entity Tags and Confidence")
+
+        confidence_label = tk.Label(tags_window, text="Filter tags by confidence:", font=("Helvetica", 12, "bold"))
+        confidence_label.pack(pady=10)
+
+        confidence_scale = tk.Scale(
+            tags_window,
+            from_=0,
+            to=1,
+            resolution=0.01,
+            orient=tk.HORIZONTAL,
+            label="Confidence Threshold",
+            length=300
+        )
+        confidence_scale.set(0.1)
+        confidence_scale.pack(padx=10, pady=5)
+
+        total_count_label = tk.Label(tags_window, text="", font=("Helvetica", 12))
+        total_count_label.pack(pady=5)
+
+        tags_frame = tk.Frame(tags_window)
+        tags_frame.pack(pady=10)
+
+        def update_displayed_tags():
+            for widget in tags_frame.winfo_children():
+                widget.destroy()
+
+            threshold = confidence_scale.get()
+
+            filtered_tags = [tag for tag in entity.tags if
+                             tag[1] >= threshold]
+
+            total_count_label.config(text=f"Total Tags Meeting Confidence ({threshold:.2f}): {len(filtered_tags)}")
+
+            for tag in filtered_tags:
+                tag_label = tk.Label(tags_frame, text=f"{tag[0]} (Confidence: {tag[1]:.2f})")
+                tag_label.pack(anchor='w', padx=10)
+
+        update_displayed_tags()
+
+        confidence_scale.bind("<Motion>", lambda event: update_displayed_tags())
+
+        close_button = tk.Button(tags_window, text="Close", command=tags_window.destroy)
+        close_button.pack(pady=10)

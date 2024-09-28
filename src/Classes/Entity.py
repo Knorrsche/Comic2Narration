@@ -18,7 +18,7 @@ class Entity:
         eT.SubElement(element,'Named_Entity_Id').text = str(self.named_entity_id)
 
         bbox = eT.SubElement(element, 'BoundingBox')
-        bbox.text = ','.join(map(str, self.bounding_box))
+        bbox.text = ','.join(f"{key}:{value}" for key, value in self.bounding_box.items())
 
 
         tags_element = eT.SubElement(element, 'Tags')
