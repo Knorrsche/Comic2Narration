@@ -106,7 +106,7 @@ def main(image_path: str, model, step_size: int = 10, window_size: Tuple[int, in
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     step_size = max(1, image.shape[1] // 10)
-    window_size = (image.shape[1] // 8, image.shape[0] // 4)
+    window_size = (image.shape[1] // 6, image.shape[0] // 3)
     windows = sliding_window(image, step_size, window_size)
 
     results = []
@@ -132,6 +132,6 @@ def main(image_path: str, model, step_size: int = 10, window_size: Tuple[int, in
 if __name__ == "__main__":
     tagger = Tagger(model_name='vit', gen_threshold=0.35, char_threshold=0.75)
 
-    image_path = r"C:\Users\derra\Desktop\images\tester.png"  # Update this path accordingly
+    image_path = r"C:\Users\derra\Desktop\images\tester3.png"
 
     main(image_path, tagger)
