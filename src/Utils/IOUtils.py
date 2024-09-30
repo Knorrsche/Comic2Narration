@@ -162,6 +162,7 @@ def parase_entities(en_elem):
     )
     entity.named_entity_id = int(escape_text(en_elem.find('Named_Entity_Id').text))
     entity.tags = parse_tags(en_elem.find('Tags'))
+    entity.starting_tag = str_to_bool(en_elem.find('Active_Tag').text)
     return entity
 
 def parse_tags(en_elem):

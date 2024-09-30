@@ -109,15 +109,17 @@ class Comic:
 
             for panel in scene:
                 for entity in panel.entities:
+                    if not entity.active_tag:
+                        continue
                     entities.append(entity)
-                    filtered_tags = [tag[0] for tag in entity.tags if tag[1] >= confidence]
-                    entity_tags.append(filtered_tags)
+                    entity.tags = [tag for tag in entity.tags if tag[1] >= confidence]
+                    entity_tags.append([tag[0] for tag in entity.tags])
 
             mlb = None
             one_hot_encoded_tags = None
             if input_type in ['One-Hot Encoding', 'TF-IDF-scaled One-Hot', 'TF-IDF-scaled Word2Vec']:
                 mlb = MultiLabelBinarizer()
-                one_hot_encoded_tags = mlb.fit_transform([tag[0] for tags in entity_tags for tag in tags])
+                one_hot_encoded_tags = mlb.fit_transform(entity_tags)
 
             tf_idf_vector = None
             if input_type in ['TF-IDF-scaled One-Hot', 'TF-IDF-scaled Word2Vec']:
@@ -191,6 +193,15 @@ class Comic:
             except Exception as e:
                 if debug:
                     print(f"Error running {algorithm} on {input_type}: {e}")
+
+    #TODO: Find better algorithm to identify wrongly classified images
+    def update_entities(self, entity_confidence_minimum):
+        for scene in self.scenes:
+            for panel in scene:
+                for entity in panel.entities:
+                    has_active_tag = any(tag[1] > entity_confidence_minimum for tag in entity.tags)
+                    entity.active_tag = has_active_tag
+
 
     #TODO can be more efficent
     def update_scenes(self):

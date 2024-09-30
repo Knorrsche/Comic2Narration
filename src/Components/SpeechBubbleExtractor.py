@@ -61,6 +61,8 @@ class SpeechBubbleExtractor:
             speech_bubble_type: SpeechBubbleType = self.classify_speech_bubble()
             speech_bubble_image = iu.image_from_bbox(page_image, speech_bubble_data)
             description = self.ocr_text(speech_bubble_image)
+            if description is None or description == "":
+                continue
             speech_bubble = SpeechBubble(speech_bubble_type, description, speech_bubble_data, speech_bubble_image)
 
             for panel in page.panels:

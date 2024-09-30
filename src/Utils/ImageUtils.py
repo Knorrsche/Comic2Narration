@@ -50,6 +50,34 @@ def draw_bounding_box(image, bbox, color, thickness=2, number=None):
     return image
 
 
+def calculate_iou(bbox1, bbox2):
+    x1_start = bbox1['x'] - bbox1['width'] / 2
+    y1_start = bbox1['y'] - bbox1['height'] / 2
+    x1_end = x1_start + bbox1['width']
+    y1_end = y1_start + bbox1['height']
+
+    x2_start = bbox2['x'] - bbox2['width'] / 2
+    y2_start = bbox2['y'] - bbox2['height'] / 2
+    x2_end = x2_start + bbox2['width']
+    y2_end = y2_start + bbox2['height']
+
+    x_inter_start = max(x1_start, x2_start)
+    y_inter_start = max(y1_start, y2_start)
+    x_inter_end = min(x1_end, x2_end)
+    y_inter_end = min(y1_end, y2_end)
+
+    inter_width = max(0, x_inter_end - x_inter_start)
+    inter_height = max(0, y_inter_end - y_inter_start)
+    intersection_area = inter_width * inter_height
+
+    bbox1_area = bbox1['width'] * bbox1['height']
+    bbox2_area = bbox2['width'] * bbox2['height']
+
+    union_area = bbox1_area + bbox2_area - intersection_area
+
+    iou = intersection_area / union_area if union_area > 0 else 0
+    return iou
+
 def image_from_bbox(image, bbox):
     x = int(bbox['x'] - bbox['width'] / 2)
     y = int(bbox['y'] - bbox['height'] / 2)

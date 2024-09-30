@@ -11,12 +11,13 @@ class Entity:
         self.image = None
         self.named_entity_id = 0
         self.tags = []
+        self.active_tag = True
 
     def to_xml(self):
         element = eT.Element('Entity')
         eT.SubElement(element, 'Name').text = self.get_entity_template_name()
         eT.SubElement(element,'Named_Entity_Id').text = str(self.named_entity_id)
-
+        eT.SubElement(element, 'Active_Tag').text = str(self.active_tag)
         bbox = eT.SubElement(element, 'BoundingBox')
         bbox.text = ','.join(f"{key}:{value}" for key, value in self.bounding_box.items())
 

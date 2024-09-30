@@ -317,7 +317,7 @@ class ComicPreprocessor:
                 if not page:
                     continue
 
-                thread = threading.Thread(target=self.handel_detect_entity, args=(page,))
+                thread = threading.Thread(target=self.handle_detect_entity, args=(page,))
                 threads.append(thread)
                 logging.debug(f'Starting Entity Extraction thread for page {page.page_index}')
                 thread.start()
@@ -328,8 +328,7 @@ class ComicPreprocessor:
             threads = []
             logging.debug('\n')
 
-    def handel_detect_entity(self, page: Page):
-
+    def handle_detect_entity(self, page: Page, iou_threshold=0.8):
         CLIENT = InferenceHTTPClient(
             api_url="https://detect.roboflow.com",
             api_key="bbQfI1dqQMBQJJnHI4AU"
@@ -339,16 +338,17 @@ class ComicPreprocessor:
         entities = []
 
         for entity_data in result_entities['predictions']:
-            if entity_data['confidence'] < 0:
+            if entity_data['confidence'] < 0.05:
                 continue
 
             entity = Entity(entity_data)
             entity.image = iu.image_from_bbox(page.page_image, entity_data)
-            entities.append(entity)
 
             for panel in page.panels:
                 if iu.is_bbox_overlapping(panel.bounding_box, entity.bounding_box):
-                    panel.entities.append(entity)
+                    if not any(iu.calculate_iou(existing_entity.bounding_box, entity.bounding_box) > iou_threshold
+                               for existing_entity in panel.entities):
+                        panel.entities.append(entity)
 
         for panel in page.panels:
             entities = panel.entities

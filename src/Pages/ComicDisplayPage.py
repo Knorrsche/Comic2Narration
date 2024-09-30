@@ -23,6 +23,8 @@ class ComicDisplayPage:
         self.show_entities = True
         self.show_text = False
         self.import_path = filepath
+        self.confidence_limit = 0.1
+        self.entity_min_confidence = 0.9
 
         self.engine = pyttsx3.init()
         self.buttons = []
@@ -83,6 +85,8 @@ class ComicDisplayPage:
     def display_images(self):
         if self.current_page_pair_index < 0 or self.current_page_pair_index >= len(self.comic.page_pairs):
             return
+
+        self.comic.update_entities(self.entity_min_confidence)
 
         left_page: Page = self.comic.page_pairs[self.current_page_pair_index][0]
         right_page: Page = self.comic.page_pairs[self.current_page_pair_index][1]
@@ -274,6 +278,7 @@ class ComicDisplayPage:
         confidence_label.pack(pady=10)
         confidence_entry = tk.Entry(input_window)
         confidence_entry.pack(pady=5)
+        confidence_entry.insert(0, self.confidence_limit)
 
         algorithm_label = tk.Label(input_window, text="Select Clustering Algorithm:")
         algorithm_label.pack(pady=10)
@@ -298,6 +303,7 @@ class ComicDisplayPage:
         submit_button.pack(pady=10)
 
     def submit_entities(self, input_window, entity_entries, algorithm_var, input_type_var, confidence_entry):
+        self.confidence_limit = confidence_entry.get()
         cluster_list = []
         for entry in entity_entries:
             try:
@@ -403,8 +409,9 @@ class ComicDisplayPage:
 
                     center_x = bbox['x'] * width_scale
                     center_y = bbox['y'] * height_scale
-                    w = bbox['width'] * width_scale
-                    h = bbox['height'] * height_scale
+
+                    w = (bbox['width'] * width_scale) / 10
+                    h = (bbox['height'] * height_scale) / 10
 
                     button = tk.Button(
                         frame,
@@ -501,7 +508,7 @@ class ComicDisplayPage:
             label="Confidence Threshold",
             length=300
         )
-        confidence_scale.set(0.1)
+        confidence_scale.set(self.confidence_limit)
         confidence_scale.pack(padx=10, pady=5)
 
         total_count_label = tk.Label(tags_window, text="", font=("Helvetica", 12))
@@ -524,7 +531,7 @@ class ComicDisplayPage:
             for tag in filtered_tags:
                 tag_label = tk.Label(tags_frame, text=f"{tag[0]} (Confidence: {tag[1]:.2f})")
                 tag_label.pack(anchor='w', padx=10)
-
+            self.confidence_limit = threshold
         update_displayed_tags()
 
         confidence_scale.bind("<Motion>", lambda event: update_displayed_tags())

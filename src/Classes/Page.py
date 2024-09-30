@@ -45,6 +45,8 @@ class Page:
             ) if draw_panels is True else new_image
 
             for entity in panel.entities:
+                if not entity.active_tag:
+                    continue
                 new_image = iU.draw_bounding_box(
                     new_image,entity.bounding_box,self.bbox_color_entity,self.bbox_thickness_entity,
                 entity.named_entity_id) if draw_entities is True else new_image
