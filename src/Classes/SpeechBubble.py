@@ -21,6 +21,7 @@ class SpeechBubble:
         self.image = image
         self.speaker_id = 0
         self.speaker: List[Entity] = []
+        self.trail = None
 
     def set_speaker(self, speaker: List[Entity]):
         self.speaker = speaker

@@ -1,0 +1,242 @@
+Page 2 Summary:
+Here's an updated narrative summary incorporating the new page of panels:
+
+**Narrative Arc 1:  A Post-Battle Reconciliation and a Strange Request.**
+
+Spider-Man, visibly exhausted but relieved, receives a grateful hug from a police officer who expresses appreciation for his actions during a recent incident.  The officer is pleased to offer any assistance Spider-Man might need.  However, Spider-Man has a more specific request: he needs the damaged remains of a large robotic device to be delivered to Horizon Labs.
+
+**Narrative Arc 2:  Delivery and Scientific Curiosity.**
+
+Spider-Man directs the large robotic parts to be delivered to Horizon Labs.  A woman, seemingly an associate at Horizon Labs, receives the components.  Meanwhile, another scientist, seemingly an associate of hers, cautions about handling the parts with care.
+
+
+**Narrative Arc 3: The Living Brain Discovery and a Collaborative Effort.**
+
+Two scientists (Pete and Max) are shown in a lab, reacting with stunned awe to a technological marvel — a “living brain,” described as a super-powered computer within the robot remains.  Pete communicates this extraordinary discovery to another individual, showcasing his excitement and disbelief.  One of the scientists asks for assistance from the other to help manage the technology.
+
+
+**Narrative Arc 4: Grady's Role and Peter's Whereabouts.**
+
+The conversation shifts as one scientist (Max) mentions Grady Scraps, another coworker known for his good-natured nature but tendency for errors.  He is shown separately, carrying a piece of equipment (possibly related to the robotic parts).  Later, another scientist, referring to Grady, inquires about the whereabouts of Peter Parker, who seems to be on site.  This suggests that Peter might be involved in the research or has some connection to the discovery of the living brain.  We see Grady in his lab, working with the "Living Brain."
+
+
+Panel Bounding Box for Arc 1: (10, 10, 320, 175) (Start of the Arc, though the arc encompasses other panels)
+Panel Bounding Box for Arc 3: (536, 540, 676, 677) (Start of the arc, focusing on the reactions of Pete and Max)
+
+
+
+Processing new page...
+Page 1 Summary:
+Here's an updated narrative summary incorporating the new page of panels:
+
+**Narrative Arc 1:  A Post-Battle Reconciliation and a Strange Request (Continued).**
+
+This arc remains largely unchanged from the previous summary. The initial scenes of Spider-Man receiving gratitude and requesting the delivery of robotic parts to Horizon Labs are still relevant.
+
+**Narrative Arc 2:  Delivery and Scientific Curiosity (Continued).**
+
+This arc is also largely unchanged. The delivery of the robotic components to Horizon Labs remains the central focus, along with the initial cautious reactions from lab personnel.
+
+**Narrative Arc 3: The Living Brain Discovery and a Collaborative Effort (Expanded).**
+
+This arc expands significantly.  Following the initial awe and disbelief surrounding the "living brain" discovery,  a discussion ensues between the two scientists. One scientist expresses a desire to fully understand this new technology, focusing on both its strengths and weaknesses.  Another scientist, appearing somewhat distracted, is interrupted during a seemingly urgent project involving the construction of advanced weaponry. He is later shown to be more deeply involved with the "living brain" project than initially implied. This scientist, while acknowledging the potential for weaponization of the technology, assures his colleague that his company's intention is to use it for peaceful purposes.
+
+**Narrative Arc 4: Grady's Role and Peter's Whereabouts (Expanded).**
+
+This arc is also expanded upon. The focus shifts to Max, who raises concerns about the potential misuse of the technology, suggesting it could be used for lethal applications despite its peaceful intentions.  He specifically questions Peter Parker, implying that Peter is involved in the project and should be informed of the potentially dangerous implications of the equipment he's requesting.  The scientists are visibly concerned about the potential for harm.  The final panel strongly emphasizes the revolutionary nature of the technology and the need for careful consideration of its possible applications.
+
+
+**Narrative Arc 5: The Uneasy Alliance and the Potential for Misuse.**
+
+This new arc emerges from the conversation between the two scientists. One scientist is focused on understanding the technology's potential while the other acknowledges the moral and ethical dilemmas associated with its powerful capabilities.  The tension highlights a potential conflict—one of responsible technological advancement versus a worry that the technology could be repurposed for destructive aims.
+
+
+Panel Bounding Box for Arc 1: (10, 10, 320, 175) (Start of the Arc, though the arc encompasses other panels)
+Panel Bounding Box for Arc 3: (536, 540, 676, 677) (Start of the arc, focusing on the reactions of Pete and Max)
+Panel Bounding Box for Arc 5: (338, 461, 665, 536) (Start of the arc, highlighting the conversation about the technology's potential)
+
+
+Processing new page...
+Page 2 Summary:
+Here's an updated narrative summary incorporating the new page of panels:
+
+**Narrative Arc 1: A Post-Battle Reconciliation and a Strange Request (Continued).**
+
+This arc remains largely unchanged.  Spider-Man's request for the damaged robotic parts to be delivered to Horizon Labs is still the key event.  The gratitude from the officer underscores the successful outcome of his recent mission.
+
+**Narrative Arc 2: Delivery and Scientific Curiosity (Continued).**
+
+This arc also remains largely unchanged, focusing on the delivery of the robotic parts and the cautious responses of the Horizon Labs personnel.
+
+**Narrative Arc 3: The Living Brain Discovery and a Collaborative Effort (Expanded).**
+
+This arc is further expanded. The scientists' initial awe at the "living brain" gives way to a serious discussion about its potential and the ethical considerations of its use.  One scientist, preoccupied with a seemingly unrelated project, is subtly shown to be more deeply involved with the "living brain" than first thought.  While expressing a desire for peaceful applications, the scientists remain concerned about the technology's potentially dangerous uses.
+
+**Narrative Arc 4: Grady's Role and Peter's Whereabouts (Expanded).**
+
+This arc expands.  Concern grows over the technology's misuse.  Max expresses his worry about the technology's potential for lethal weaponization, contrasting the company's stated peaceful intention.  His questions about Peter Parker’s whereabouts imply Peter's involvement and the need to keep him informed of potential dangers. The scientists' concern about the technology's implications is highlighted.
+
+**Narrative Arc 5: The Uneasy Alliance and the Potential for Misuse (Expanded).**
+
+This arc is significantly expanded. The tension between the two scientists—one focused on understanding the technology and the other concerned about ethical implications— intensifies. The narrative reveals a significant power struggle; one scientist appears to be manipulating the situation to ensure that he is credited for his work, potentially at the expense of another.  The intense focus on this scientist’s ambition and the potential for misuse creates a growing sense of unease.  This is particularly evident in his secretive and almost self-congratulatory actions and thought processes.
+
+**Narrative Arc 6:  A Betrayal and a Cover-up.**
+
+This new arc begins. One scientist's true intentions are revealed, showcasing a deliberate scheme to take credit for the success of another's work. This scientist actively seeks to obscure the actual contributions of Peter Parker and ensure that only his name receives credit. This reveals not only ambition but a willingness to engage in deceit and manipulate the situation for personal gain.
+
+Panel Bounding Box for Arc 1: (10, 10, 320, 175) 
+Panel Bounding Box for Arc 3: (536, 540, 676, 677)
+Panel Bounding Box for Arc 5: (338, 461, 665, 536)
+Panel Bounding Box for Arc 6: (10, 340, 330, 455) (The panel showing the scientist's internal monologue about taking credit for the work)
+
+
+
+Processing new page...
+Page 1 Summary:
+Here's an updated narrative summary incorporating the new page of panels:
+
+**Narrative Arc 1: Peter Parker's Double Life and a Distraction.**
+
+This arc introduces Peter Parker in his dual roles: as a nightclub manager and as Spider-Man.  The panel shows him juggling the mundane aspects of his job (customer service, safety checks) while secretly monitoring a situation through his Spider-Man communication device.  He appears calm and collected outwardly, but his internal monologue reveals a quiet awareness of multiple demands on his time and attention.  A seemingly ordinary date is interrupted by a call on his headset, diverting his focus.
+
+**Narrative Arc 2: The Date and a Secret Mission.**
+
+Peter is on a date with a beautiful woman.  The initial interactions are pleasant, but Peter’s attention is clearly divided.  His date notices his distraction, and he apologizes, revealing that he's monitoring a situation related to Spider-Man.  He explains that he's listening in on the communications of a criminal organization, the Sinister Six, and their plans.  His date's initial reaction is one of surprise, then concern.
+
+**Narrative Arc 3:  Unveiling the Sinister Six's Plot.**
+
+The panels reveal that Peter is monitoring the Sinister Six's communications.  The threat is significant, and this plot point increases tension. Peter’s date is increasingly concerned about his involvement and the danger it may imply.
+
+**Narrative Arc 4:  A Growing Sense of Foreboding.**
+
+The date continues, but the underlying tension grows.  Peter's date's concern increases as he reveals that the Sinister Six is planning their next attack.  This underscores the weight of Peter’s double life and the constant threat of danger.  The final panel focuses on her shocked expression, highlighting the gravity of the situation she's just learned about.
+
+
+Panel Bounding Box for Arc 1: (10, 10, 325, 170)
+Panel Bounding Box for Arc 2: (338, 220, 665, 335)
+Panel Bounding Box for Arc 3: (10, 220, 325, 335)
+Panel Bounding Box for Arc 4: (670, 635, 980, 720)
+
+
+
+
+Processing new page...
+Page 2 Summary:
+Here's an updated narrative summary incorporating the new page of panels:
+
+**Narrative Arc 1: Peter Parker's Double Life and a Distraction (Continued).**
+
+This arc continues, showing Peter skillfully balancing his normal life with his duties as Spider-Man.  He manages a busy nightclub, attending to customers while subtly monitoring communications through his Spider-Man headset.  A romantic dinner date with a woman is interrupted by an urgent call, shifting his focus away from the pleasantries of the evening.  The transition highlights the constant demands on Peter's time and the ever-present threat of danger in his dual existence.
+
+**Narrative Arc 2: The Date and a Secret Mission (Expanded).**
+
+This arc expands.  The date continues, albeit with a significant shift in tone.  Peter reveals to his date that he's tracking the Sinister Six, and their impending attack. His explanation is casual but reveals a serious underlying threat.  His date’s reaction is a mix of surprise, concern and a growing realization of Peter's dangerous double life.
+
+**Narrative Arc 3: Unveiling the Sinister Six's Plot (Expanded).**
+
+This arc expands on the Sinister Six's plan.  The panels reveal the specifics of their intentions—to acquire a powerful atmospheric condenser—and their location.  Peter's tracking of their movements suggests a planned, coordinated attack.  The growing tension is palpable, emphasizing the immediate danger faced.  Peter’s calm demeanor contrasts with the urgency of the situation he's monitoring.
+
+**Narrative Arc 4: A Growing Sense of Foreboding (Expanded).**
+
+This arc expands and intensifies.  The romantic atmosphere of the date is overshadowed by the impending threat. Peter explains the urgency, highlighting the imminent danger. The woman's response shows apprehension and worry, reflecting the severity of the situation.  The tone is serious, emphasizing the risk and highlighting the burden of Peter's secret life on his relationships.
+
+**Narrative Arc 5: Strategic Planning and Coordinated Action.**
+
+A new arc begins. Peter shares his knowledge of the Sinister Six's plan with his date, who surprisingly remains calm and offers support.  They discuss the next steps—finding one of the Sinister Six members at Horizon Labs, and then launching an attack.  Their coordinated planning and her calm demeanor suggest a strong and collaborative approach to neutralizing the threat.  The panel shows them toasting, their shared purpose bringing them closer together.
+
+
+Panel Bounding Box for Arc 1: (10, 10, 325, 170)
+Panel Bounding Box for Arc 2: (338, 220, 665, 335)
+Panel Bounding Box for Arc 3: (10, 220, 325, 335)
+Panel Bounding Box for Arc 4: (670, 635, 980, 720)
+Panel Bounding Box for Arc 5: (670, 535, 980, 630)
+
+
+
+Processing new page...
+Page 1 Summary:
+Here's an updated narrative summary incorporating the new page of panels:
+
+**Narrative Arc 1:  A Night Out, Interrupted.**
+
+Peter Parker, juggling his job as a nightclub manager with his responsibilities as Spider-Man, enjoys a date.  He appears relaxed and attentive initially, but his demeanor subtly shifts when his Spider-Sense alerts him to an urgent situation.  His date notices his distraction, creating a brief moment of awkwardness.
+
+**Narrative Arc 2:  Revealing a Dangerous Secret.**
+
+Peter reveals to his date that he’s tracking the Sinister Six, a group of supervillains planning a major attack involving a powerful device.  This confession changes the atmosphere of the date, replacing casual conversation with a growing sense of unease. The date’s initial reaction is one of surprise and concern, reflecting the gravity of the situation Peter has unveiled.
+
+**Narrative Arc 3: The Sinister Six's Plan Unfolds.**
+
+The narrative focuses on the Sinister Six's plan to obtain a powerful atmospheric condenser.  Their coordinated movements and intentions are revealed through Peter's monitoring, building suspense and illustrating the immediate danger. The focus shifts to the urgency of the situation, contrasting with Peter's outwardly calm demeanor.
+
+**Narrative Arc 4: A Date Turns into a Mission Briefing.**
+
+Peter’s date reacts with a mix of concern and determination.  Instead of panic, the woman calmly offers assistance, showing unexpected resilience and a surprising willingness to help. This establishes a bond of shared purpose amidst impending danger.  They begin to plan, with Peter outlining a strategy centered around finding a specific member of the Sinister Six at Horizon Labs, their intended target.  Their discussion is collaborative, suggesting a strong dynamic.
+
+**Narrative Arc 5:  The Assault on Horizon Labs Begins.**
+
+The scene shifts to Horizon Labs, where a chaotic scene unfolds. A large, powerful device is being broken into by a destructive force, with debris flying everywhere. A team of costumed individuals confronts the group, engaging in a dynamic and action-packed conflict.
+
+**Narrative Arc 6: Coordinated Counterattack.**
+
+A team of heroes, led by a powerful woman with insect-like wings, confronts the invaders. The heroes work together swiftly and efficiently, utilizing their skills and abilities to disable the attackers. Their swift actions highlight their professionalism and coordination, as they handle the situation with impressive teamwork.
+
+**Narrative Arc 7:  The Chase and Capture.**
+
+A dramatic chase ensues, with one of the villains—a hulking, powerful figure—escaping. The heroes manage to catch up to and subdue the villain, bringing the immediate conflict to an end. Their efficiency suggests a well-practiced team that understands how to handle high-stakes situations.
+
+
+
+Panel Bounding Box for Arc 1: (10, 10, 325, 170)
+Panel Bounding Box for Arc 2: (338, 220, 665, 335)
+Panel Bounding Box for Arc 3: (10, 220, 325, 335)
+Panel Bounding Box for Arc 4: (670, 535, 980, 630)
+Panel Bounding Box for Arc 5: (10, 340, 330, 455)
+Panel Bounding Box for Arc 6: (338, 461, 665, 536)
+Panel Bounding Box for Arc 7: (338, 540, 665, 668)
+
+
+
+Here's an updated narrative summary incorporating the new page of panels:
+
+**Narrative Arc 1:  A Night Out, Interrupted.**
+
+Peter Parker, juggling his job as a nightclub manager with his responsibilities as Spider-Man, enjoys a date.  He appears relaxed and attentive initially, but his demeanor subtly shifts when his Spider-Sense alerts him to an urgent situation.  His date notices his distraction, creating a brief moment of awkwardness.
+
+**Narrative Arc 2:  Revealing a Dangerous Secret.**
+
+Peter reveals to his date that he’s tracking the Sinister Six, a group of supervillains planning a major attack involving a powerful device.  This confession changes the atmosphere of the date, replacing casual conversation with a growing sense of unease. The date’s initial reaction is one of surprise and concern, reflecting the gravity of the situation Peter has unveiled.
+
+**Narrative Arc 3: The Sinister Six's Plan Unfolds.**
+
+The narrative focuses on the Sinister Six's plan to obtain a powerful atmospheric condenser.  Their coordinated movements and intentions are revealed through Peter's monitoring, building suspense and illustrating the immediate danger. The focus shifts to the urgency of the situation, contrasting with Peter's outwardly calm demeanor.
+
+**Narrative Arc 4: A Date Turns into a Mission Briefing.**
+
+Peter’s date reacts with a mix of concern and determination.  Instead of panic, the woman calmly offers assistance, showing unexpected resilience and a surprising willingness to help. This establishes a bond of shared purpose amidst impending danger.  They begin to plan, with Peter outlining a strategy centered around finding a specific member of the Sinister Six at Horizon Labs, their intended target.  Their discussion is collaborative, suggesting a strong dynamic.
+
+**Narrative Arc 5:  The Assault on Horizon Labs Begins.**
+
+The scene shifts to Horizon Labs, where a chaotic scene unfolds. A large, powerful device is being broken into by a destructive force, with debris flying everywhere. A team of costumed individuals confronts the group, engaging in a dynamic and action-packed conflict.
+
+**Narrative Arc 6: Coordinated Counterattack.**
+
+A team of heroes, led by a powerful woman with insect-like wings, confronts the invaders. The heroes work together swiftly and efficiently, utilizing their skills and abilities to disable the attackers. Their swift actions highlight their professionalism and coordination, as they handle the situation with impressive teamwork.
+
+**Narrative Arc 7:  The Chase and Capture.**
+
+A dramatic chase ensues, with one of the villains—a hulking, powerful figure—escaping. The heroes manage to catch up to and subdue the villain, bringing the immediate conflict to an end. Their efficiency suggests a well-practiced team that understands how to handle high-stakes situations.
+
+
+
+Panel Bounding Box for Arc 1: (10, 10, 325, 170)
+Panel Bounding Box for Arc 2: (338, 220, 665, 335)
+Panel Bounding Box for Arc 3: (10, 220, 325, 335)
+Panel Bounding Box for Arc 4: (670, 535, 980, 630)
+Panel Bounding Box for Arc 5: (10, 340, 330, 455)
+Panel Bounding Box for Arc 6: (338, 461, 665, 536)
+Panel Bounding Box for Arc 7: (338, 540, 665, 668)
+
+
+
+Process finished with exit code 0

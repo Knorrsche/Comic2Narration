@@ -1,0 +1,32 @@
+{
+  "Narrative_Arcs": [
+    {
+      "arc_id": "1",
+      "title": "Spider-Man's Automaton Retrieval and Delivery to Horizon Labs",
+      "pages": [1, 2],
+      "description": "Spider-Man, after being thanked by a police officer, retrieves the damaged parts of a sophisticated automaton and delivers these parts to Horizon Labs. The scientists express both excitement and caution regarding the advanced technology and a 'living brain' component within.",
+      "coordinates": "(5, 5, 325, 110)"
+    },
+    {
+      "arc_id": "2",
+      "title": "Assessment and Ethical Debate Over the Automaton at Horizon Labs",
+      "pages": [1, 2, 3, 4, 5],
+      "description": "At Horizon Labs, scientists carefully examine the automaton parts, expressing surprise and excitement over the advanced technology, particularly the 'living brain' component. Grady Scraps explains the automaton's components, leading to discussions about Peter Parker's involvement and the potential misuse of the technology. As Max Modell defends his peaceful intentions regarding the 'living brain' technology, concerns arise about its ethical implications and the risk of weaponization. The tension escalates with the covert observation by Otto Octavius, who plans to claim credit for Peter Parker's achievements, while the scientists mobilize to address the growing threat posed by the technology.",
+      "coordinates": "(330, 5, 985, 985)"
+    },
+    {
+      "arc_id": "3",
+      "title": "Peter Parker's Internal Conflict and Romantic Evening",
+      "pages": [3, 4, 5],
+      "description": "Peter Parker grapples with the implications of his actions and his legacy, feeling the unfairness of benefiting from others' efforts. This reflection is interrupted by a call from Mary Jane Watson. The narrative shifts to Peter's nightclub, where he navigates the complexities of his double life while dealing with work-related challenges. Later, he and Mary Jane enjoy a romantic dinner, discussing the situation and planning their next steps regarding the automaton's technology.",
+      "coordinates": "(330, 660, 985, 985)"
+    },
+    {
+      "arc_id": "4",
+      "title": "Emerging Threats: The Beetle and Speed Demon Confrontation",
+      "pages": [5],
+      "description": "A new threat emerges as the Beetle and Speed Demon actively seek to secure a piece of the automaton's technology. This confrontation adds urgency to the ongoing investigation at Horizon Labs, heightening the stakes for both Peter Parker and the lab team.",
+      "coordinates": "(330, 660, 655, 985)"
+    }
+  ]
+}

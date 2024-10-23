@@ -17,6 +17,21 @@ from PIL import Image
 import io
 import cv2
 import numpy as np
+from skimage.color import rgb2gray
+from skimage.feature import canny
+from skimage.morphology import dilation
+from scipy import ndimage as ndi
+from skimage.measure import label
+from skimage.color import label2rgb
+from skimage.measure import regionprops
+import imageio
+from PIL import Image,ImageDraw,ImageFont
+import numpy as np
+from transformers import AutoModel
+import torch
+from src.entity_detector import wdv3_timm
+from src.Classes import SpeechBubble, SpeechBubbleType
+import google.generativeai as genai
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -28,31 +43,112 @@ logging.basicConfig(
 class ComicPreprocessor:
     current_comic: Comic
     export_path: str
+    comic_summarization_prompt = (
+        "GENERAL INSTRUCTIONS:\n"
+        "You are an expert in comic panel summarization. Your task is to analyze the comic panels and provide a comprehensive, continuous narrative by combining individual panels into larger narrative arcs. These arcs should progress linearly without any gaps or interruptions, forming a coherent story timeline. You will be given previous narrative summaries and your job is to expand and refine them incrementally based on new panels or pages.\n\n"
 
-    str_general_instuction = ('GENERAL INSTRUCTIONS:\n'
-                              '    You are a expert in Comic summarization. Your task is to describe what is happening in an image of a comic panel.\n'
-                              '    You will also get context in form of text from speech bubbles, but you are not allowed to return the words from the speech bubbles.\n'
-                              '    You should only use the text as a reference to improve the panel description.\n'
-                              '    Answer in a short sentence and try to only describe information\'s that are needed to understand the narrative. \n'
-                              '    Do not talk about speech bubbles and do not recite them.\n'
-                              '    When answering do not mention that this is an image or comic. Answer like you would write a Novel.\n'
-                              '    \n'
-                              '    Example: A shadow is fighting against a Robot at night. A police officer is helping.\n'
-                              '    \n'
-                              )
+        "Your goal is to create a seamless flow of events, where narrative arcs do not overlap or create disjointed stories. Instead, arcs should be aligned sequentially, following one another to build a continuous timeline.\n\n"
+
+        "Key Guidelines:\n"
+        "1. **Focus on Continuous Narrative Arcs**:\n"
+        "   - Narrative arcs must occur in a continuous line, meaning no gaps or holes should exist within an arc. If an arc spans multiple panels, the events should follow one another smoothly without skipping over unrelated content.\n"
+        "   - Arcs should align sequentially and flow into each other logically. One arc cannot span into the middle of another; instead, arcs should build upon one another in a chronological, cohesive timeline.\n"
+        "   - **Example**: A fight scene unfolding over multiple panels must be described as one continuous arc. You cannot describe a scene from one arc, skip several panels, and return to it later without finishing the previous one.\n\n"
+
+        "2. **Avoid Overlapping Arcs**:\n"
+        "   - Arcs must not overlap. Once an arc concludes, the next arc should start from the following panel in a clear and distinct way. Ensure that there is no overlap where two arcs are describing the same moment from different perspectives.\n"
+        "   - **Example**: If Arc 1 describes a chase scene, Arc 2 should follow directly after, showing the next stage of the pursuit or a new development rather than splitting the chase across two separate arcs.\n\n"
+
+        "3. **Infer from Dialogue, But Do Not Quote**:\n"
+        "   - Use speech bubbles to understand the narrative’s context but avoid quoting or referencing them directly. Focus on summarizing the character actions, emotions, and plot developments instead.\n"
+        "   - **Example**: If a character expresses fear in a dialogue, describe their body language and facial expressions, and how these emotions impact the story.\n\n"
+
+        "4. **Seamless Transitions Between Arcs**:\n"
+        "   - Transitions between arcs should be smooth and logical. If a panel contributes to an ongoing arc, integrate it into the existing arc. If the story shifts (e.g., a new conflict or setting), start a new arc, ensuring it picks up logically from where the previous one ended.\n"
+        "   - **Example**: After a tense conversation, if a character leaves to confront an enemy, the arc should transition naturally from the conversation to the confrontation.\n\n"
+
+        "5. **Refine and Update the Summary**:\n"
+        "   - With each new page or panel, incrementally improve the narrative summary. You may need to expand, merge, or adjust arcs based on new information or clarify details from previous panels.\n"
+        "   - Align arcs to build a single, cohesive timeline, ensuring that no unrelated or disjointed content interrupts the flow.\n\n"
+
+        "6. **Keep Descriptions Concise and Focused**:\n"
+        "   - Focus on describing key plot points, character actions, and emotional shifts. Avoid excessive visual details unless they are crucial to the plot or character development.\n"
+        "   - **Example**: If a character retrieves an object of significance, describe the action and its importance, rather than delving into unnecessary background details.\n\n"
+
+        "Additional Guidelines:\n"
+        "- **No Gaps in Arcs**:\n"
+        "  - Ensure that each narrative arc runs continuously, with no holes or skipped panels. If a panel belongs to a given arc, ensure it fits within the timeline and directly connects to the previous and subsequent panels in that arc.\n\n"
+
+        "- **Chronological Alignment**:\n"
+        "  - All arcs must fit into a single, linear timeline, progressing logically from one event to the next. If a new arc starts, it must pick up directly after the last one ended, without revisiting or overlapping previous content.\n\n"
+
+        "- **No Overlapping Arcs**:\n"
+        "  - Each arc should be distinct from others. Do not allow two arcs to describe different parts of the same scene or moment. Once an arc ends, it cannot reappear in another form.\n\n"
+
+        "Tone and Style:\n"
+        "- **Novel-like Descriptions**:\n"
+        "  - Treat the task as if you are writing scenes from a novel, translating visual comic events into a cohesive, flowing narrative.\n\n"
+
+        "- **Active Voice**:\n"
+        "  - Use active voice to keep the narrative lively, focusing on actions and emotional intensity.\n\n"
+
+        "- **Stick to Clear Depictions**:\n"
+        "  - Do not speculate or add interpretations unless they are clearly implied by the comic panels. Stick to describing what is explicitly depicted in the story.\n\n"
+
+        "Task:\n"
+        "Your job is to update the summary and chapter list based on new panels or pages. Focus on expanding and refining existing narrative arcs based on new developments, or create a new arc if the story shifts significantly.\n\n"
+
+        "- Each arc should form part of a continuous timeline, with no gaps or skipped sections.\n"
+        "- Ensure that arcs are aligned and do not overlap. Once an arc concludes, the next one should follow it directly.\n"
+        "- When new panels clarify or enhance earlier parts of the story, update the summary to reflect this, ensuring a smooth, chronological progression.\n\n"
+
+        "Bounding Boxes for Panel Coordinates:\n"
+        "For each new narrative arc, output the coordinates (bounding boxes) of the panel that marks the start of the arc. The coordinates should be in the format: (x1, y1, x2, y2) where (x1, y1) is the top-left corner of the panel, and (x2, y2) is the bottom-right corner.\n\n"
+
+        "Output Format:\n"
+        "{{\n"
+        "  \"Narrative_Arcs\": [\n"
+        "    {{\n"
+        "      \"arc_id\": \"1\",\n"
+        "      \"title\": \"Title of Arc\",\n"
+        "      \"pages\": [1, 2],\n"
+        "      \"description\": \"Description of Arc\",\n"
+        "      \"coordinates\": \"(x1, y1, x2, y2)\"\n"
+        "    }}\n"
+        "    ...\n"
+        "  ]\n"
+        "}}\n\n"
+
+        "Each iteration should update and expand upon the previous narrative arcs. If an arc spans multiple panels, expand on it. If new panels provide clarity or enhance earlier parts of the narrative, update the entire summary to reflect this.\n"
+        "Also, try to summarize smaller arcs into larger ones for better coherence."
+    )
 
     def __init__(self, name: str, volume: int, main_series: Series, secondary_series: Optional[List[Series]],
                  rgb_arrays):
         page_pairs = self.convert_array_to_page_pairs(rgb_arrays)
         self.current_comic = self.convert_images_to_comic(name, volume, main_series, secondary_series, page_pairs)
+        self.model = AutoModel.from_pretrained("ragavsachdeva/magiv2", trust_remote_code=True).eval()
+        self.tagger = wdv3_timm.Tagger(model_name='vit', gen_threshold=0.35, char_threshold=0.75)
+        model_name: str = "gemini-1.5-flash-002"
+        self.model_gemini = genai.GenerativeModel(model_name=model_name)
+        genai.configure(api_key="AIzaSyCoUfTjZU-zNZ2lNKY_BnDuyNTu8lHQ9EM")
         self.detect_panels()
-        self.detect_entities()
-        self.create_tags()
+        #self.create_tags()
+        print(self.describe_narrative())
 
     @staticmethod
     def convert_images_to_comic(name: str, volume: int, main_series: Series,
                                 secondary_series: Optional[List[Series]], page_pairs):
         return Comic(name, volume, main_series, secondary_series, page_pairs)
+
+    def guess_speakers(self):
+        for page_pair in self.current_comic.page_pairs:
+            for page in page_pair:
+                if not page:
+                    continue
+                for panel in page.panels:
+                    t = 2
+
 
     # TODO: refactor loop and use counter
     def convert_array_to_page_pairs(self, rgb_arrays):
@@ -101,7 +197,7 @@ class ComicPreprocessor:
 
         message = {
             'role': 'user',
-            'content': self.str_general_instuction,
+            'content': self.comic_summarization_prompt,
             'images': [image_bytes]
         }
 
@@ -111,116 +207,59 @@ class ComicPreprocessor:
         )
 
         description = res['message']['content']
+        print(description)
         return description
 
-    def improve_panel_descriptions(self):
-        threads = []
-
-        for i, page_pair in enumerate(self.current_comic.page_pairs):
-            for page in page_pair:
-                if not page:
+    def describe_narrative(self):
+        """
+        Summarizes the comic pages and integrates the previous narrative context.
+        :param pages: List of comic page objects that contain images.
+        :return: A cumulative summary of the entire comic.
+        """
+        overall_summaries = []  # To hold all scene summaries
+        current_summary = ""  # Holds the summary for the current iteration
+        page_counter = 1
+        for pages in self.current_comic.page_pairs:  # Assuming page_pairs is part of the comic object
+            for page in pages:
+                if page is None:
                     continue
 
-                thread = threading.Thread(target=self.handle_improve_panels_neighbors, args=(page,))
-                threads.append(thread)
-                logging.debug(f'Starting Description Improvement with neighbors thread for page {page.page_index}')
-                thread.start()
+                print('Processing new page...')
 
-            for thread in threads:
-                thread.join()
-                logging.debug(f'Threads for Panel Extraction with neighbors of page_pair {i} finished')
-            threads = []
-            logging.debug('\n')
+                # Convert the page image to RGB
+                image_rgb = cv2.cvtColor(page.page_image, cv2.COLOR_BGR2RGB)
 
-        for i, page_pair in enumerate(self.current_comic.page_pairs):
-            for page in page_pair:
-                if not page:
-                    continue
+                # Save image as temporary file instead of converting to byte array
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
+                    temp_filename = tmp_file.name
+                    cv2.imwrite(temp_filename, image_rgb)  # Save image to temporary file
 
-                thread = threading.Thread(target=self.handle_improve_panels_page, args=(page,))
-                threads.append(thread)
-                logging.debug(f'Starting Description Improvement with neighbors thread for page {page.page_index}')
-                thread.start()
+                sample_file = genai.upload_file(path=temp_filename,
+                                                display_name="Comic Page")
 
-            for thread in threads:
-                thread.join()
-                logging.debug(f'Threads for Panel Extraction with neighbors of page_pair {i} finished')
-            threads = []
-            logging.debug('\n')
+                # Combine the current summary into the prompt
+                previous_summary_text = f"\n\nPrevious Narrative Summary:\n{current_summary}" if current_summary else ""
+                full_prompt = self.comic_summarization_prompt + previous_summary_text
 
-    def handle_improve_panels_page(self, page):
-        panels = page.panels
-        str_page_context = 'This is the context of the whole Page. Use this to improve the description of the Current Panel. \n'
-        # Make page get transcript function
-        for i, panel in enumerate(panels):
-            str_page_context += f'Panel {i + 1} Description: {panel.description}\n'
-            #str_page_context += f'Panel {i + 1} Speech Bubbles: {panel.get_transcript}\n'
+                # Prepare the image and prompt for the model
+                response = self.model_gemini.generate_content([sample_file, full_prompt])
 
-        for i, panel in enumerate(panels):
-            str_context = ''
-            str_context += str_page_context
-            str_context += f'Current Panel {i + 1} Description: {panel.description}\n'
-            #str_context += f'Current Panel {i+1} Speech Bubbles: {panel.get_transcript}\n'
+                # Get the description from the model's response
+                description = response.text
 
-            image_rgb = cv2.cvtColor(panel.image, cv2.COLOR_BGR2RGB)
-            pil_image = Image.fromarray(image_rgb)
+                # Update the current summary with the latest description
+                current_summary += f'Page: {page_counter} \n {description} \n'
 
-            image_bytes = io.BytesIO()
-            pil_image.save(image_bytes, format='PNG')
-            image_bytes = image_bytes.getvalue()
+                # Append the new description to the overall summaries for continuity
+                overall_summaries.append(description)
 
-            message = {
-                'role': 'user',
-                'content': str_context + '\n' + '\n' + self.str_general_instuction + '\n' + '\n' + 'Improve the Current Panel description following the general istruction and use as few words as possible',
-                'images': [image_bytes]
-            }
+                # Output the current page's summary for review
+                print(f"Page {pages.index(page) + 1} Summary:\n{description}\n")
 
-            res = ollama.chat(
-                model='llava',
-                messages=[message]
-            )
+                page_counter += 1
 
-            description = res['message']['content']
-            panel.descriptions.append(description)
-            panel.description = description
-
-    def handle_improve_panels_neighbors(self, page):
-        panels = page.panels
-        for i, panel in enumerate(panels):
-            str_context = ''
-            current_panel = panel
-            if i != 0:
-                previous_panel = panels[i - 1]
-                str_context += f'Previous Panel Description: {previous_panel.description}\n'
-                #str_context += f'Previous Panel Speech Bubbles: {previous_panel.get_transcript}\n'
-            if i != len(panels) - 1:
-                next_panel = panels[i + 1]
-                str_context += f'Next Panel Description: {next_panel.description}\n'
-                #str_context += f'Next Panel Speech Bubbles: {next_panel.get_transcript}\n'
-            str_context += f'Current Panel Description: {current_panel.description}\n'
-            #str_context += f'Current Panel Speech Bubbles: {current_panel.get_transcript}\n'
-
-            image_rgb = cv2.cvtColor(current_panel.image, cv2.COLOR_BGR2RGB)
-            pil_image = Image.fromarray(image_rgb)
-
-            image_bytes = io.BytesIO()
-            pil_image.save(image_bytes, format='PNG')
-            image_bytes = image_bytes.getvalue()
-
-            message = {
-                'role': 'user',
-                'content': str_context + '\n' + '\n' + self.str_general_instuction + '\n' + '\n' + 'Improve the Current Panel description following the general istruction and use as few words as possible.',
-                'images': [image_bytes]
-            }
-
-            res = ollama.chat(
-                model='llava',
-                messages=[message]
-            )
-
-            description = res['message']['content']
-            panel.descriptions.append(description)
-            panel.description = description
+        # After processing all pages, return the cumulative summary
+        return response.text  # Returns the final cumulative summary at the end
 
     # TODO find way for threading
     def create_tags(self):
@@ -235,8 +274,8 @@ class ComicPreprocessor:
                 self.handle_create_tags(page)
             logging.debug('\n')
 
+    #Use local model
     def handle_create_tags(self, page):
-        client = Client("SmilingWolf/wd-tagger")
 
         for panel in page.panels:
             for entity in panel.entities:
@@ -245,115 +284,190 @@ class ComicPreprocessor:
                 pil_image.save('tmp.jpg')
                 image_input = handle_file('tmp.jpg')
 
-                result = client.predict(
-                        image=image_input,
-                        model_repo="SmilingWolf/wd-swinv2-tagger-v3",
-                        general_thresh=0.05,
-                        general_mcut_enabled=False,
-                        character_thresh=0.85,
-                        character_mcut_enabled=False,
-                        api_name="/predict"
-                    )
-
-                confidences = result[3]['confidences']
-                tag_confidence_tuples = [(item['label'], item['confidence']) for item in confidences]
+                result = self.tagger.process_image('tmp.jpg')
+                confidences = result
+                tag_confidence_tuples = [(label, confidence) for label, confidence in confidences.items()]
 
                 entity.tags = tag_confidence_tuples
 
                 # TODO: add to .env as name
                 os.remove('tmp.jpg')
 
-
     #TODO: Refactor with extract_speech_bubbles
     def detect_panels(self):
-        threads = []
 
         for i, page_pair in enumerate(self.current_comic.page_pairs):
             for page in page_pair:
                 if not page:
                     continue
 
-                thread = threading.Thread(target=self.handle_detect_panels, args=(page,))
-                threads.append(thread)
                 logging.debug(f'Starting Panel Extraction thread for page {page.page_index}')
-                thread.start()
+                self.handle_detect_objects(page)
 
-            for thread in threads:
-                thread.join()
                 logging.debug(f'Threads for Panel Extraction of page_pair {i} finished')
-            threads = []
             logging.debug('\n')
 
-    def handle_detect_panels(self, page: Page):
 
-        CLIENT_PANEL = InferenceHTTPClient(
-            api_url="https://detect.roboflow.com",
-            api_key="bbQfI1dqQMBQJJnHI4AU"
-        )
+    def x1y1x2y2_to_xywh(self, bbox):
+        x1, y1, x2, y2 = bbox
+        return {
+            "x": max(x1, 0),
+            "y": max(y1, 0),
+            "width": max(x2 - x1, 0),
+            "height": max(y2 - y1, 0)
+        }
 
-        result_panels = CLIENT_PANEL.infer(page.page_image, model_id="comic-panel-detectors/7")
+    def handle_detect_objects(self, page: Page):
+        data = self.detect_objects(page.page_image)
+        panel_list = data[0]['panels']
+        speechbubble_list = data[0]['texts']
+        entity_list = data[0]['characters']
+        tails = data[0]['tails']
+        text_character_associations = data[0]['text_character_associations']
+        text_tail_associations = data[0]['text_tail_associations']
+        character_cluster_labels = data[0]['character_cluster_labels']
+        is_essential_text = data[0]['is_essential_text']
+        character_names = data[0]['character_names']
+
         panels = []
 
-        for panel_data in result_panels['predictions']:
-            if panel_data['confidence'] < 0.3:
-                continue
+        for panel in panel_list:
+            bbox = self.x1y1x2y2_to_xywh(panel)
+            print(bbox)
+            panel_image = iu.image_from_bbox(page.page_image, bbox)
 
-            panel_image = iu.image_from_bbox(page.page_image, panel_data)
-
-            description = self.describe_image(panel_image)
-            panel = Panel(description, panel_data, panel_image)
+            #description = self.describe_image(panel_image)
+            description = ""
+            panel = Panel(description, bbox, panel_image)
             panel.descriptions.append(panel.description)
             panels.append(panel)
 
-        panels = sorted(panels, key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height'] / 2),
-                                               (p.bounding_box['x']) - p.bounding_box['width'] / 2))
+        panels = sorted(panels, key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height']),
+                                               (p.bounding_box['x']) - p.bounding_box['width']))
         page.panels = panels
 
-    def detect_entities(self):
-        threads = []
-
-        for i, page_pair in enumerate(self.current_comic.page_pairs):
-            for page in page_pair:
-                if not page:
-                    continue
-
-                thread = threading.Thread(target=self.handle_detect_entity, args=(page,))
-                threads.append(thread)
-                logging.debug(f'Starting Entity Extraction thread for page {page.page_index}')
-                thread.start()
-
-            for thread in threads:
-                thread.join()
-                logging.debug(f'Threads for Entity Extraction of page_pair {i} finished')
-            threads = []
-            logging.debug('\n')
-
-    def handle_detect_entity(self, page: Page, iou_threshold=0.8):
-        CLIENT = InferenceHTTPClient(
-            api_url="https://detect.roboflow.com",
-            api_key="bbQfI1dqQMBQJJnHI4AU"
-        )
-
-        result_entities = CLIENT.infer(page.page_image, model_id="marvel_chars/1")
-        entities = []
-
-        for entity_data in result_entities['predictions']:
-            if entity_data['confidence'] < 0.05:
-                continue
-
-            entity = Entity(entity_data)
-            entity.image = iu.image_from_bbox(page.page_image, entity_data)
+        for i, entity_ in enumerate(entity_list):
+            bbox = self.x1y1x2y2_to_xywh(entity_)
+            entity = Entity(bbox)
+            entity.named_entity_id = character_cluster_labels[i]
+            entity.image = iu.image_from_bbox(page.page_image, bbox)
 
             for panel in page.panels:
-                if iu.is_bbox_overlapping(panel.bounding_box, entity.bounding_box):
-                    if not any(iu.calculate_iou(existing_entity.bounding_box, entity.bounding_box) > iou_threshold
-                               for existing_entity in panel.entities):
-                        panel.entities.append(entity)
+                best_panel = None
+                highest_iou = 0
 
-        for panel in page.panels:
-            entities = panel.entities
-            panel.entities = sorted(entities,
-                                    key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height'] / 2),
-                                                   (p.bounding_box['x']) - p.bounding_box['width'] / 2))
+                for panel in page.panels:
+                    iou_value = iu.calculate_iou(panel.bounding_box, entity.bounding_box)
 
+                    if iou_value > highest_iou:
+                        highest_iou = iou_value
+                        best_panel = panel
 
+                if best_panel is not None and highest_iou > 0:
+                    if not any(iu.calculate_iou(existing_entity.bounding_box, entity.bounding_box) > 0.7
+                               for existing_entity in best_panel.entities):
+                        best_panel.entities.append(entity)
+
+                for panel in page.panels:
+                    entities = panel.entities
+                    panel.entities = sorted(entities,
+                                            key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height']),
+                                                           (p.bounding_box['x']) - p.bounding_box['width']))
+
+        print(text_character_associations)
+        print(is_essential_text)
+        essential_counter = 0
+        for i, speechbubble in enumerate(speechbubble_list):
+            bbox = self.x1y1x2y2_to_xywh(speechbubble)
+            speech_bubble_image = iu.image_from_bbox(page.page_image, bbox)
+            description = ""
+            speech_bubble = SpeechBubble(SpeechBubbleType.SPEECH, description, bbox, speech_bubble_image)
+            speech_bubble.type = 'dialogue'
+            speech_bubble.person_list = []
+            #TODO: Use classification of speech bubble for this
+            if is_essential_text[i]:
+                #speech_bubble.speaker_id = character_cluster_labels[text_character_associations[essential_counter][1]]
+                essential_counter += 1
+                speech_bubble.speaker_id= 1
+            #else:
+                speech_bubble.speaker_id = 0
+
+            for panel in page.panels:
+                if iu.is_bbox_overlapping(panel.bounding_box, speech_bubble.bounding_box):
+                    panel.speech_bubbles.append(speech_bubble)
+
+                for panel in page.panels:
+                    speech_bubbles = panel.speech_bubbles
+                    panel.speech_bubbles = sorted(speech_bubbles,
+                                                  key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height']),
+                                                                 (p.bounding_box['x']) - p.bounding_box['width']))
+
+    def detect_objects(self, image):
+        images = []
+        images.append(image)
+        character_bank = {
+            "images": [],
+            "names": []
+        }
+        with torch.no_grad():
+            page_results = self.model.do_chapter_wide_prediction(images, character_bank, use_tqdm=True,
+                                                                 do_ocr=False)
+        return page_results
+
+    def canny_panels(self, image):
+        grayscale = rgb2gray(image)
+        edges = canny(grayscale)
+
+        thick_edges = dilation(dilation(edges))
+        segmentation = ndi.binary_fill_holes(thick_edges)
+
+        labels = label(segmentation)
+
+        def do_bboxes_overlap(a, b):
+            return (
+                    a[0] < b[2] and
+                    a[2] > b[0] and
+                    a[1] < b[3] and
+                    a[3] > b[1]
+            )
+
+        def merge_bboxes(a, b):
+            return (
+                min(a[0], b[0]),
+                min(a[1], b[1]),
+                max(a[2], b[2]),
+                max(a[3], b[3])
+            )
+
+        regions = regionprops(labels)
+        panels = []
+
+        for region in regions:
+            for i, panel in enumerate(panels):
+                if do_bboxes_overlap(region.bbox, panel):
+                    #panels[i] = merge_bboxes(panel, region.bbox)
+                    panels.append(region.bbox)
+                    break
+            else:
+                panels.append(region.bbox)
+
+        im = image
+        for i, bbox in reversed(list(enumerate(panels))):
+            area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+            if area < 0.01 * im.shape[0] * im.shape[1]:
+                del panels[i]
+
+        formatted_panels = []
+        for bbox in panels:
+            x = bbox[1]
+            y = bbox[0]
+            width = bbox[3] - bbox[1]
+            height = bbox[2] - bbox[0]
+            formatted_panels.append({
+                "x": x,
+                "y": y,
+                "width": width,
+                "height": height
+            })
+
+        return formatted_panels

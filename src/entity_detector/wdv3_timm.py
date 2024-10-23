@@ -127,18 +127,18 @@ class Tagger:
 
     def process_image(self, image_path: Path):
         print(f"\nProcessing image: {image_path}")
-        if not image_path.is_file():
-            print(f"Image file not found: {image_path}")
-            return
+        #if not image_path.is_file():
+        #    print(f"Image file not found: {image_path}")
+        #    return
 
-        print("Loading image and preprocessing...")
+        #print("Loading image and preprocessing...")
         img_input: Image.Image = Image.open(image_path)
         img_input = pil_ensure_rgb(img_input)
         img_input = pil_pad_square(img_input)
         inputs: Tensor = self.transform(img_input).unsqueeze(0)
         inputs = inputs[:, [2, 1, 0]]
 
-        print("Running inference...")
+        #print("Running inference...")
         with torch.inference_mode():
             if torch_device.type != "cpu":
                 self.model = self.model.to(torch_device)
@@ -152,7 +152,7 @@ class Tagger:
                 outputs = outputs.to("cpu")
                 self.model = self.model.to("cpu")
 
-        print("Processing results...")
+        #print("Processing results...")
         caption, taglist, ratings, character, general = get_tags(
             probs=outputs.squeeze(0),
             labels=self.labels,
@@ -160,7 +160,7 @@ class Tagger:
             char_threshold=self.char_threshold,
         )
 
-        self.display_results(caption, taglist, ratings, character, general)
+        #self.display_results(caption, taglist, ratings, character, general)
         return general
 
     def display_results(self, caption, taglist, ratings, character, general):

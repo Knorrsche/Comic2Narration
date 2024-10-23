@@ -57,7 +57,7 @@ class Page:
             for speech_bubble in panel.speech_bubbles:
                 new_image = iU.draw_bounding_box(
                     new_image, speech_bubble.bounding_box, self.bbox_color_speech_bubble,
-                    self.bbox_thickness_speech_bubble,speech_bubble.speaker_id
+                    self.bbox_thickness_speech_bubble,speech_bubble.speaker_id,type=speech_bubble.type
                 )
 
         return new_image

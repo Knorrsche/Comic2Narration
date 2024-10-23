@@ -416,7 +416,7 @@ class ComicDisplayPage:
                     button = tk.Button(
                         frame,
                         bg="blue",
-                        text=speech_bubble.text,
+                        text='entity',
                         font=fnt.Font(size=6),
                         borderwidth=0,
                         highlightthickness=0,

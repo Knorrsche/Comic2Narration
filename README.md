@@ -7,6 +7,7 @@ source .venv/bin/activate
 ### 2. Install the required packages
 ```bash
 pip install -r requirements.txt
+python -m spacy download en_core_web_sm
 ```
 ### 3. Install Tesseract and enter path in .env
 #### 1. Install Tessract
