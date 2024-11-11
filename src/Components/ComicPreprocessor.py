@@ -140,7 +140,7 @@ class ComicPreprocessor:
         self.tagger = wdv3_timm.Tagger(model_name='vit', gen_threshold=0.35, char_threshold=0.75)
         model_name: str = "gemini-1.5-flash-002"
         self.model_gemini = genai.GenerativeModel(model_name=model_name)
-        genai.configure(api_key="AIzaSyCoUfTjZU-zNZ2lNKY_BnDuyNTu8lHQ9EM")
+        genai.configure(api_key="")
         self.detect_panels()
         self.describe_narrative()
         self.match_entities()
