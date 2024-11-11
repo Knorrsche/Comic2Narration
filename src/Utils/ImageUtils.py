@@ -18,7 +18,7 @@ def draw_bounding_box(image, bbox, color, thickness=2, number=None, type=None):
     end_point = (x + w, y + h)
     image = cv2.rectangle(image, start_point, end_point, color, thickness)
 
-    font_scale = 1
+    font_scale = 2
     font_thickness = 1
     font = cv2.FONT_HERSHEY_SIMPLEX
 

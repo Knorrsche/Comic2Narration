@@ -13,6 +13,8 @@ class Panel:
         self.scene_id = 0
         self.entities: List[Entity] = []
         self.descriptions = []
+        #TODO: Update import export wiht page_id
+        self.page_id = 0
 
         if speech_bubbles is None:
             self.speech_bubbles: List[SpeechBubble] = []

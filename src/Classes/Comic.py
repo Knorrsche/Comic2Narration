@@ -1,4 +1,5 @@
 import math
+import os
 from collections import defaultdict
 
 from gensim.models import Word2Vec, KeyedVectors
@@ -12,6 +13,9 @@ import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import MultiLabelBinarizer, normalize
 from sklearn.cluster import KMeans, AgglomerativeClustering, SpectralClustering, AffinityPropagation, Birch, DBSCAN
+import google.generativeai as genai
+import numpy as np
+import cv2
 
 
 class Comic:
@@ -23,6 +27,7 @@ class Comic:
         self.secondary_series = secondary_series
         self.page_pairs = page_pairs
         self.scenes = []
+        self.scene_data = ''
 
     def to_narrative(self) -> str:
         script = ''
@@ -71,6 +76,125 @@ class Comic:
                 pair_element_right.append(pair[1].to_xml())
 
         return element
+
+    def find_clusters(self):
+        model_name: str = "gemini-1.5-flash-002"
+        model_gemini = genai.GenerativeModel(model_name=model_name)
+        genai.configure(api_key="AIzaSyCoUfTjZU-zNZ2lNKY_BnDuyNTu8lHQ9EM")
+
+        entity_tag_str = "List of Entities: \n"
+        entity_counter = 1
+        panel_counter = 1
+        for scene in self.scenes:
+            for panel in scene:
+                entity_tag_str += f"Panel {panel_counter}: \n"
+                for entity in panel.entities:
+                    entity_tag_str += f"Entity {entity_counter} Tags: \n"
+                    for tag, confidence in entity.tags:
+                        entity_tag_str += f"Tag: {tag}, Confidence: {confidence} \n"
+                    entity_counter += 1
+                panel_counter += 1
+        prompt = (
+            "Given a list of Entities that occur in a Comic and their Tags with confidence, try to find the ammount of characters that are in there. This means you should return a cluster size. Keep in mind that in each panel the same entity can only apear once. \n"
+            "Output format: Clustersize: 1... \n"
+            "Calulate a clustersize estimate for following list of enitties: \n")
+
+        prompt += entity_tag_str
+
+        response = model_gemini.generate_content([prompt])
+
+        print(response.text)
+
+    def reset_scenes(self):
+        for scene in self.scenes:
+            for panel in scene:
+                panel.starting_tag = False
+                panel.scene_id = 0
+        self.scenes = []
+
+    def reset_entities(self):
+        for scene in self.scenes:
+            for panel in scene:
+                panel.entities.clear()
+
+    def resize_image(self,image, target_size):
+        return cv2.resize(image, (target_size, target_size))
+
+    def enhanced_matching(self, save_path="output_entities"):
+        os.makedirs(save_path, exist_ok=True)  # Create the output directory if it doesn't exist
+
+        for scene_idx, scene in enumerate(self.scenes):
+            # Gather all entity images from each panel in the current scene
+            entity_images = [entity.image for panel in scene for entity in panel.entities]
+            num_entities = len(entity_images)
+
+            if num_entities == 0:
+                print(f"No entities found in scene {scene_idx + 1}")
+                continue
+
+            # Determine grid size based on the number of entities
+            grid_cols = math.ceil(math.sqrt(num_entities))  # Number of columns in the grid
+            grid_rows = math.ceil(num_entities / grid_cols)  # Number of rows in the grid
+
+            # Determine maximum width and height of entity images to create a consistent grid
+            max_entity_height = max(entity.shape[0] for entity in entity_images)
+            max_entity_width = max(entity.shape[1] for entity in entity_images)
+
+            # Create a canvas for arranging entity images in a grid format
+            canvas_height = grid_rows * max_entity_height
+            canvas_width = grid_cols * max_entity_width
+            canvas = np.zeros((canvas_height, canvas_width, 3), dtype=entity_images[0].dtype)
+
+            # Place each entity image onto the canvas
+            for idx, entity_img in enumerate(entity_images):
+                row = idx // grid_cols
+                col = idx % grid_cols
+                y_offset = row * max_entity_height
+                x_offset = col * max_entity_width
+
+                # Add the entity image to the canvas at the calculated position
+                canvas[y_offset:y_offset + entity_img.shape[0], x_offset:x_offset + entity_img.shape[1]] = entity_img
+
+            # Save the combined image for this scene's entities
+            file_path = f"{save_path}/scene_{scene_idx + 1}_entities.jpg"
+            cv2.imwrite(file_path, canvas)
+            print(f"Combined entity image saved at: {file_path}")
+
+    def get_scene_images(self):
+        comic_pages = []
+        scene_images = []
+        for page_pair in self.page_pairs:
+            for page in page_pair:
+                if page is not None and page not in comic_pages:
+                    comic_pages.append(page)
+
+        for idx, scene in enumerate(self.scenes):
+            scene_pages = []
+            used_pages = []
+
+            for panel in scene:
+                if comic_pages[panel.page_id]not in used_pages:
+                    page_image = comic_pages[panel.page_id].page_image
+
+                    if page_image.shape[2] == 3:
+                        page_image = cv2.cvtColor(page_image, cv2.COLOR_RGB2BGR)
+
+                    page_image = page_image.astype(np.uint8)
+
+                    scene_pages.append(page_image)
+                    used_pages.append(comic_pages[panel.page_id])
+
+            if scene_pages:
+                try:
+                    scene_image = np.hstack(scene_pages)
+                    scene_images.append((scene_image,used_pages))
+                    #cv2.imwrite(f'scene_{idx}.png', scene_image)
+                except ValueError as e:
+                    print(f"Error stacking images for scene {idx}: {e}")
+        return scene_images
+
+
+
 
     #TODO: Add temp saving of word2vec to not need to recalculate every time
     def match_entities(self, clusters_list, algorithm='Birch', input_type='One-Hot Encoding', confidence=0.1,
@@ -193,6 +317,9 @@ class Comic:
             except Exception as e:
                 if debug:
                     print(f"Error running {algorithm} on {input_type}: {e}")
+
+
+
 
     #TODO: Find better algorithm to identify wrongly classified images
     def update_entities(self, entity_confidence_minimum):

@@ -1,6 +1,8 @@
 import base64
+import json
 import logging
 import os
+import random
 import threading
 from typing import Optional, List
 from Classes.Panel import Panel
@@ -25,7 +27,7 @@ from skimage.measure import label
 from skimage.color import label2rgb
 from skimage.measure import regionprops
 import imageio
-from PIL import Image,ImageDraw,ImageFont
+from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 from transformers import AutoModel
 import torch
@@ -43,6 +45,7 @@ logging.basicConfig(
 class ComicPreprocessor:
     current_comic: Comic
     export_path: str
+    entity_id_counter = 1
     comic_summarization_prompt = (
         "GENERAL INSTRUCTIONS:\n"
         "You are an expert in comic panel summarization. Your task is to analyze the comic panels and provide a comprehensive, continuous narrative by combining individual panels into larger narrative arcs. These arcs should progress linearly without any gaps or interruptions, forming a coherent story timeline. You will be given previous narrative summaries and your job is to expand and refine them incrementally based on new panels or pages.\n\n"
@@ -96,14 +99,14 @@ class ComicPreprocessor:
         "  - Do not speculate or add interpretations unless they are clearly implied by the comic panels. Stick to describing what is explicitly depicted in the story.\n\n"
 
         "Task:\n"
-        "Your job is to update the summary and chapter list based on new panels or pages. Focus on expanding and refining existing narrative arcs based on new developments, or create a new arc if the story shifts significantly.\n\n"
+        "Your job is to update the summary and chapter list based on new panels or pages. Focus on expanding and refining existing narrative arcs based on new developments, or create a new arc if the story shifts significantly. On average there should be no Scene that is longer than 2 pages. Also add a list of chracters that appear in this scene. If there is no clue about the direct name of one chracter, try to describe hime like Officer or James Mother.\n\n"
 
         "- Each arc should form part of a continuous timeline, with no gaps or skipped sections.\n"
         "- Ensure that arcs are aligned and do not overlap. Once an arc concludes, the next one should follow it directly.\n"
         "- When new panels clarify or enhance earlier parts of the story, update the summary to reflect this, ensuring a smooth, chronological progression.\n\n"
 
         "Bounding Boxes for Panel Coordinates:\n"
-        "For each new narrative arc, output the coordinates (bounding boxes) of the panel that marks the start of the arc. The coordinates should be in the format: (x1, y1, x2, y2) where (x1, y1) is the top-left corner of the panel, and (x2, y2) is the bottom-right corner.\n\n"
+        "For each new narrative arc, output the coordinates (bounding boxes) of the panel that marks the start of the arc. The coordinates should be in the format: (x1, y1, x2, y2) where (x1, y1) is the top-left corner of the panel, and (x2, y2) is the bottom-right corner. You get all panel data as an Input and try to find the most suitable panel bounding box.\n\n"
 
         "Output Format:\n"
         "{{\n"
@@ -111,9 +114,13 @@ class ComicPreprocessor:
         "    {{\n"
         "      \"arc_id\": \"1\",\n"
         "      \"title\": \"Title of Arc\",\n"
-        "      \"pages\": [1, 2],\n"
+        "      \"starting_page\": \"1\",\n"
         "      \"description\": \"Description of Arc\",\n"
-        "      \"coordinates\": \"(x1, y1, x2, y2)\"\n"
+        "      \"occurring_characters\": \"[\"(James, Police Officer)\"]\",\n"
+        "      \"coordinates_of_starting_panel\": \"(x1, y1, x2, y2)\",\n"
+        "      \"panel_index_of_startpanel\": \"1\"\n"
+        "      \"reasoning_for_new_arc\": \"explanation text\"\n"
+        "      \"confidence\": \" ...\"\n"
         "    }}\n"
         "    ...\n"
         "  ]\n"
@@ -121,6 +128,8 @@ class ComicPreprocessor:
 
         "Each iteration should update and expand upon the previous narrative arcs. If an arc spans multiple panels, expand on it. If new panels provide clarity or enhance earlier parts of the narrative, update the entire summary to reflect this.\n"
         "Also, try to summarize smaller arcs into larger ones for better coherence."
+        "Keep in mind that a new arc can only start at the end of the previous arc. Provide the page index in which the arc starts. The page index is always given as an extra input."
+        "Also add a confidence which tells how sure you are if an arc is selfstanding."
     )
 
     def __init__(self, name: str, volume: int, main_series: Series, secondary_series: Optional[List[Series]],
@@ -133,8 +142,10 @@ class ComicPreprocessor:
         self.model_gemini = genai.GenerativeModel(model_name=model_name)
         genai.configure(api_key="AIzaSyCoUfTjZU-zNZ2lNKY_BnDuyNTu8lHQ9EM")
         self.detect_panels()
-        #self.create_tags()
-        print(self.describe_narrative())
+        self.describe_narrative()
+        self.match_entities()
+        self.create_tags()
+        #self.find_clusters()
 
     @staticmethod
     def convert_images_to_comic(name: str, volume: int, main_series: Series,
@@ -148,7 +159,6 @@ class ComicPreprocessor:
                     continue
                 for panel in page.panels:
                     t = 2
-
 
     # TODO: refactor loop and use counter
     def convert_array_to_page_pairs(self, rgb_arrays):
@@ -201,10 +211,13 @@ class ComicPreprocessor:
             'images': [image_bytes]
         }
 
-        res = ollama.chat(
-            model='llava',
-            messages=[message]
-        )
+        try:
+            res = ollama.chat(
+                model='llava',
+                messages=[message]
+            )
+        except Exception as e:
+            print(e)
 
         description = res['message']['content']
         print(description)
@@ -216,50 +229,220 @@ class ComicPreprocessor:
         :param pages: List of comic page objects that contain images.
         :return: A cumulative summary of the entire comic.
         """
-        overall_summaries = []  # To hold all scene summaries
-        current_summary = ""  # Holds the summary for the current iteration
+        overall_summaries = []
+        current_summary = ""
         page_counter = 1
-        for pages in self.current_comic.page_pairs:  # Assuming page_pairs is part of the comic object
+        pages_list = []
+        for pages in self.current_comic.page_pairs:
             for page in pages:
                 if page is None:
                     continue
 
                 print('Processing new page...')
 
-                # Convert the page image to RGB
+                pages_list.append(page)
+
                 image_rgb = cv2.cvtColor(page.page_image, cv2.COLOR_BGR2RGB)
 
-                # Save image as temporary file instead of converting to byte array
                 with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
                     temp_filename = tmp_file.name
-                    cv2.imwrite(temp_filename, image_rgb)  # Save image to temporary file
+                    cv2.imwrite(temp_filename, image_rgb)
 
                 sample_file = genai.upload_file(path=temp_filename,
                                                 display_name="Comic Page")
 
-                # Combine the current summary into the prompt
+                page_information = 'Current Page Data: \n'
+                page_information = page_information + f'Page Number: + {page.page_index} \n Panel Data: \n'
+                panels = page.panels
+
+                for i, panel in enumerate(panels):
+                    page_information = page_information + f'Panel Index: + {i + 1}  Boundingbox = {panel.bounding_box} \n'
+
                 previous_summary_text = f"\n\nPrevious Narrative Summary:\n{current_summary}" if current_summary else ""
-                full_prompt = self.comic_summarization_prompt + previous_summary_text
+                full_prompt = self.comic_summarization_prompt + '\n' + previous_summary_text + '\n' + page_information
 
-                # Prepare the image and prompt for the model
-                response = self.model_gemini.generate_content([sample_file, full_prompt])
+                try:
+                    response = self.model_gemini.generate_content([sample_file, full_prompt])
+                except Exception as e:
+                    print(e)
 
-                # Get the description from the model's response
                 description = response.text
 
-                # Update the current summary with the latest description
                 current_summary += f'Page: {page_counter} \n {description} \n'
 
-                # Append the new description to the overall summaries for continuity
                 overall_summaries.append(description)
 
-                # Output the current page's summary for review
                 print(f"Page {pages.index(page) + 1} Summary:\n{description}\n")
 
                 page_counter += 1
 
-        # After processing all pages, return the cumulative summary
-        return response.text  # Returns the final cumulative summary at the end
+        cleaned_json_string = response.text.strip('```json')
+        cleaned_json_string = cleaned_json_string.strip('```')
+        cleaned_json_string = cleaned_json_string.replace('{{', '{')
+        cleaned_json_string = cleaned_json_string.replace('}}', '}')
+        cleaned_json_string = cleaned_json_string.strip('```')
+        try:
+            json_object = json.loads(cleaned_json_string)
+        except Exception as e:
+            print(e)
+            full_prompt = f"Transform this JSON in valid json that can be used in python: {cleaned_json_string}. Only return the JSON object. this was the error message {e}"
+            response = self.model_gemini.generate_content(full_prompt)
+            cleaned_json_string = response.text.strip('```json')
+            cleaned_json_string = cleaned_json_string.strip('```')
+            print('new generated json: ' + cleaned_json_string)
+            try:
+                json_object = json.loads(cleaned_json_string)
+            except Exception as e:
+                print(e)
+                print("Error in the scene detection. Please start again or manually select the scenes.")
+                return
+
+        for arc in json_object['Narrative_Arcs']:
+            page = pages_list[int(arc['starting_page']) - 1]
+            bounding_box = arc['coordinates_of_starting_panel']
+
+            bounding_box = list(map(float, bounding_box.strip("()").split(", ")))
+
+            self.find_nearest_bounding_box(bounding_box,page.panels)
+        self.current_comic.update_scenes()
+
+        for scene in self.current_comic.scenes:
+            for panel in scene:
+                print(panel.scene_id)
+
+        self.current_comic.scene_data = cleaned_json_string
+
+    def find_nearest_bounding_box(self,bounding_box, panels):
+        target_x, target_y, target_width, target_height = bounding_box
+        target_center = (target_x + target_width / 2, target_y + target_height / 2)
+
+        min_distance = float('inf')
+        nearest_panel_index = None
+
+        for i,panel in enumerate(panels):
+            panel_box = panel.bounding_box
+            panel_center = (panel_box['x'] + panel_box['width'] / 2, panel_box['y'] + panel_box['height'] / 2)
+
+            distance = ((target_center[0] - panel_center[0]) ** 2 + (target_center[1] - panel_center[1]) ** 2) ** 0.5
+
+            if distance < min_distance:
+                min_distance = distance
+                nearest_panel_index = i
+
+        panels[nearest_panel_index].starting_tag = True
+
+    def find_names(self):
+        for pages in self.current_comic.page_pairs:
+            for page in pages:
+                if page is None:
+                    continue
+
+                notated_img = page.annotated_image(True, False, True)
+
+    def match_entities(self):
+        self.current_comic.reset_entities()
+        scene_images = self.current_comic.get_scene_images()
+        for scene_image, used_pages in scene_images:
+            data = self.detect_objects(scene_image)
+            panel_list = data[0]['panels']
+            speechbubble_list = data[0]['texts']
+            entity_list = data[0]['characters']
+            tails = data[0]['tails']
+            text_character_associations = data[0]['text_character_associations']
+            text_tail_associations = data[0]['text_tail_associations']
+            character_cluster_labels = data[0]['character_cluster_labels']
+            is_essential_text = data[0]['is_essential_text']
+            character_names = data[0]['character_names']
+
+            entities_per_page = self.adjust_bounding_boxes(entity_list, used_pages, character_cluster_labels)
+
+            for i,entities in enumerate(entities_per_page):
+                for bbox,cluster_id in entities:
+                    page = used_pages[i]
+                    entity = Entity(bbox)
+                    entity.named_entity_id = cluster_id
+                    entity.image = iu.image_from_bbox(page.page_image, bbox)
+
+                    for panel in page.panels:
+                        best_panel = None
+                        highest_iou = 0
+
+                        for panel in page.panels:
+                            iou_value = iu.calculate_iou(panel.bounding_box, entity.bounding_box)
+
+                            if iou_value > highest_iou:
+                                highest_iou = iou_value
+                                best_panel = panel
+
+                        if best_panel is not None and highest_iou > 0:
+                            if not any(iu.calculate_iou(existing_entity.bounding_box, entity.bounding_box) > 0.7
+                                       for existing_entity in best_panel.entities):
+                                best_panel.entities.append(entity)
+
+                        for panel in page.panels:
+                            entities = panel.entities
+                            panel.entities = sorted(entities,
+                                                    key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height']),
+                                                                   (p.bounding_box['x']) - p.bounding_box['width']))
+
+    def adjust_bounding_boxes(self, bounding_boxes, scene_pages, character_cluster_labels):
+        page_offsets = []
+        x_offset = 0
+
+        for page in scene_pages:
+            page_offsets.append(x_offset)
+            x_offset += page.page_image.shape[1]
+
+        adjusted_boxes_by_page = [[] for _ in scene_pages]
+
+        for cluster,box in enumerate(bounding_boxes):
+            bbox = self.x1y1x2y2_to_xywh(box)
+            x, y, w, h = bbox
+
+            page_index = None
+            for i, offset in enumerate(page_offsets):
+                if bbox['x'] >= offset and bbox['x'] < offset + scene_pages[i].page_image.shape[1]:
+                    page_index = i
+                    break
+
+            if page_index is None:
+                print("Bounding box does not fit within any page range.")
+                continue
+
+            bbox['x']= bbox['x'] - page_offsets[page_index]
+            adjusted_boxes_by_page[page_index].append((bbox, character_cluster_labels[cluster]))
+
+        return adjusted_boxes_by_page
+
+    #TODO: delete, but keep for example of cluster size estimation for the thesis
+    def find_clusters(self):
+        entity_tag_str = "List of Entities: \n"
+        entity_counter = 1
+        panel_counter = 1
+        for scene in self.current_comic.scenes:
+            for panel in scene:
+                entity_tag_str += f"Panel {panel_counter}: \n"
+                for entity in panel.entities:
+                    entity_tag_str += f"Entity {entity_counter} Tags: \n"
+                    for tag, confidence in entity.tags:
+                        entity_tag_str += f"Tag: {tag}, Confidence: {confidence} \n"
+                    entity_counter += 1
+                panel_counter += 1
+            prompt = (
+                "Given a list of Entities that occur in a Comic and their Tags with confidence, try to find the ammount of characters that are in there. This means you should return a cluster size. Keep in mind that in each panel the same entity can only apear once. \n"
+                "Output format: Clustersize: 1... \n"
+                "Calulate a clustersize estimate for the given list. \n")
+
+            entity_tag_str += prompt
+            #prompt += entity_tag_str
+
+            print(entity_tag_str)
+
+            response = self.model_gemini.generate_content([entity_tag_str])
+
+            print(response.text)
+
+            entity_tag_str = "List of Entities: \n"
 
     # TODO find way for threading
     def create_tags(self):
@@ -292,6 +475,25 @@ class ComicPreprocessor:
 
                 # TODO: add to .env as name
                 os.remove('tmp.jpg')
+                if not self.is_character(entity.tags):
+                    panel.entities.remove(entity)
+
+    def is_character(self, tag_confidence_tuples, threshold=0.7) -> bool:
+        # Filter tags based on the threshold
+        valid_tags = {tag: score for tag, score in tag_confidence_tuples if score >= threshold}
+
+        # Check if the tag 'multiple_boys' exists in the valid tags and adjust logic based on the threshold
+        if "multiple_boys" in valid_tags and valid_tags["multiple_boys"] > 0.7:
+            return False  # This entity should not be considered a character (based on the 'multiple_boys' tag)
+
+        # Check if valid tags contain any of the non-character tags
+        #if len(valid_tags) > 0 and all(
+        #tag in ["no_humans", "english_text", "monochrome", "greyscale"] for tag in valid_tags.keys()):
+        #tag in ["no_humans"] for tag in valid_tags.keys()):
+        #return False  # The entity is not a character if all valid tags are non-character tags
+
+        # If we have valid tags, and none of the conditions return False, we return True (it's a character)
+        return len(valid_tags) > 0
 
     #TODO: Refactor with extract_speech_bubbles
     def detect_panels(self):
@@ -306,7 +508,6 @@ class ComicPreprocessor:
 
                 logging.debug(f'Threads for Panel Extraction of page_pair {i} finished')
             logging.debug('\n')
-
 
     def x1y1x2y2_to_xywh(self, bbox):
         x1, y1, x2, y2 = bbox
@@ -339,6 +540,7 @@ class ComicPreprocessor:
             #description = self.describe_image(panel_image)
             description = ""
             panel = Panel(description, bbox, panel_image)
+            panel.page_id = page.page_index
             panel.descriptions.append(panel.description)
             panels.append(panel)
 
@@ -374,8 +576,6 @@ class ComicPreprocessor:
                                             key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height']),
                                                            (p.bounding_box['x']) - p.bounding_box['width']))
 
-        print(text_character_associations)
-        print(is_essential_text)
         essential_counter = 0
         for i, speechbubble in enumerate(speechbubble_list):
             bbox = self.x1y1x2y2_to_xywh(speechbubble)
@@ -388,8 +588,8 @@ class ComicPreprocessor:
             if is_essential_text[i]:
                 #speech_bubble.speaker_id = character_cluster_labels[text_character_associations[essential_counter][1]]
                 essential_counter += 1
-                speech_bubble.speaker_id= 1
-            #else:
+                speech_bubble.speaker_id = 1
+                #else:
                 speech_bubble.speaker_id = 0
 
             for panel in page.panels:
@@ -412,6 +612,10 @@ class ComicPreprocessor:
         with torch.no_grad():
             page_results = self.model.do_chapter_wide_prediction(images, character_bank, use_tqdm=True,
                                                                  do_ocr=False)
+            print(page_results)
+            #for i, (image, page_result) in enumerate(zip(image, page_results)):
+            #self.model.visualise_single_image_prediction(image, page_result, f"page_{random.randint(0, 10000)}.png")
+
         return page_results
 
     def canny_panels(self, image):

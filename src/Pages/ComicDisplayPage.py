@@ -12,7 +12,8 @@ import os
 
 
 class ComicDisplayPage:
-    def __init__(self, parent, comic, filepath):
+    def __init__(self, parent, comic, comic_preprocessor,filepath):
+        self.comic_preprocessor = comic_preprocessor
         self.parent = parent
         self.comic = comic
         self.current_page_pair_index = 0
@@ -86,7 +87,7 @@ class ComicDisplayPage:
         if self.current_page_pair_index < 0 or self.current_page_pair_index >= len(self.comic.page_pairs):
             return
 
-        self.comic.update_entities(self.entity_min_confidence)
+        #self.comic.update_entities(self.entity_min_confidence)
 
         left_page: Page = self.comic.page_pairs[self.current_page_pair_index][0]
         right_page: Page = self.comic.page_pairs[self.current_page_pair_index][1]
@@ -249,7 +250,6 @@ class ComicDisplayPage:
         input_window.title("Input Cluster Sizes and Options")
 
         num_entities = len(self.comic.scenes)
-
         self.create_input_fields(input_window, num_entities)
 
     def create_input_fields(self, input_window, num_entities):
@@ -259,20 +259,24 @@ class ComicDisplayPage:
         label = tk.Label(input_window, text="Enter Cluster Sizes:")
         label.pack(pady=10)
 
-        entity_entries = []
+        self.entity_entries = []
         if num_entities == 0:
             entry_label = tk.Label(input_window, text=f"Scene {1}:")
             entry_label.pack()
             entry = tk.Entry(input_window)
             entry.pack(pady=5)
-            entity_entries.append(entry)
+            self.entity_entries.append(entry)
         else:
             for i in range(num_entities):
                 entry_label = tk.Label(input_window, text=f"Scene {i + 1}:")
                 entry_label.pack()
                 entry = tk.Entry(input_window)
                 entry.pack(pady=5)
-                entity_entries.append(entry)
+                self.entity_entries.append(entry)
+
+        predict_button = tk.Button(input_window, text="Predict Cluster Size",
+                                   command=self.comic_preprocessor.match_entities())
+        predict_button.pack(pady=10)
 
         confidence_label = tk.Label(input_window, text="Enter Confidence Limit (0-1):")
         confidence_label.pack(pady=10)
@@ -282,7 +286,6 @@ class ComicDisplayPage:
 
         algorithm_label = tk.Label(input_window, text="Select Clustering Algorithm:")
         algorithm_label.pack(pady=10)
-
         algorithm_options = ['KMeans', 'DBSCAN', 'Agglomerative', 'Gaussian Mixture', 'Birch']
         algorithm_var = tk.StringVar(input_window)
         algorithm_var.set(algorithm_options[0])
@@ -291,7 +294,6 @@ class ComicDisplayPage:
 
         input_type_label = tk.Label(input_window, text="Select Input Encoding Type:")
         input_type_label.pack(pady=10)
-
         input_type_options = ['One-Hot Encoding', 'TF-IDF-scaled One-Hot', 'Word2Vec', 'TF-IDF-scaled Word2Vec']
         input_type_var = tk.StringVar(input_window)
         input_type_var.set(input_type_options[0])
@@ -299,8 +301,18 @@ class ComicDisplayPage:
         input_type_menu.pack(pady=5)
 
         submit_button = tk.Button(input_window, text="Submit",
-                                  command=lambda: self.submit_entities(input_window, entity_entries, algorithm_var, input_type_var, confidence_entry))
+                                  command=lambda: self.submit_entities(input_window, self.entity_entries, algorithm_var, input_type_var, confidence_entry))
         submit_button.pack(pady=10)
+
+    def predict_and_populate(self):
+        predicted_sizes = self.predict()
+        if len(predicted_sizes) != len(self.entity_entries):
+            messagebox.showerror("Error", "Mismatch in predicted cluster sizes and available scenes.")
+            return
+
+        for entry, size in zip(self.entity_entries, predicted_sizes):
+            entry.delete(0, tk.END)
+            entry.insert(0, str(size))
 
     def submit_entities(self, input_window, entity_entries, algorithm_var, input_type_var, confidence_entry):
         self.confidence_limit = confidence_entry.get()
@@ -327,8 +339,11 @@ class ComicDisplayPage:
         self.comic.match_entities(cluster_list, algorithm=algorithm, input_type=input_type, confidence=confidence_value, debug=True)
 
         self.display_images()
-
         input_window.destroy()
+
+    def predict(self):
+        self.comic.find_clusters()
+        return ""
 
     def create_interactive_buttons(self, width_scale, height_scale):
         for button in self.buttons:
@@ -354,8 +369,8 @@ class ComicDisplayPage:
                 w = (bbox['width'] * width_scale)/10
                 h = (bbox['height'] * height_scale)/10
 
-                button_x = center_x - (w / 2)
-                button_y = center_y - (h / 2)
+                button_x = center_x
+                button_y = center_y
 
                 borderwidth = 0
 
@@ -397,8 +412,8 @@ class ComicDisplayPage:
                         command=lambda e=speech_bubble: self.on_speech_bubble_click(e)
                     )
 
-                    button_x = center_x - (w / 2)
-                    button_y = center_y - (h / 2)
+                    button_x = center_x
+                    button_y = center_y
 
                     button.place(x=button_x, y=button_y, width=w, height=h)
                     self.buttons.append(button)
@@ -423,8 +438,8 @@ class ComicDisplayPage:
                         command=lambda e=entity: self.on_entity_click(e)
                     )
 
-                    button_x = center_x - (w / 2)
-                    button_y = center_y - (h / 2)
+                    button_x = center_x
+                    button_y = center_y
 
                     button.place(x=button_x, y=button_y, width=w, height=h)
                     self.buttons.append(button)
