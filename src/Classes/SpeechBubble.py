@@ -14,8 +14,8 @@ class SpeechBubbleType(Enum):
 
 class SpeechBubble:
 
-    def __init__(self, type: SpeechBubbleType, text: str, bounding_box, image=None):
-        self.type: SpeechBubbleType = type
+    def __init__(self, type: str, text: str, bounding_box, image=None):
+        self.type: str = type
         self.text = text
         self.bounding_box = bounding_box
         self.image = image
@@ -23,13 +23,13 @@ class SpeechBubble:
         self.speaker: List[Entity] = []
         self.trail = None
 
-    def set_speaker(self, speaker: List[Entity]):
-        self.speaker = speaker
+    def get_string(self):
+        return f'{self.speaker_id}: {self.text}'
 
     # TODO: Create universal function to parse strings to right format
     def to_xml(self):
         element = ET.Element('SpeechBubble')
-        ET.SubElement(element, 'Type').text = self.type.name
+        ET.SubElement(element, 'Type').text = self.type
         ET.SubElement(element, 'Text').text = IOUtils.escape_text(self.text) if self.text else ''
         ET.SubElement(element,'Speaker_Id').text = str(self.speaker_id)
         bbox = ET.SubElement(element, 'BoundingBox')

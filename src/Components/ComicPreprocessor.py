@@ -33,6 +33,7 @@ from transformers import AutoModel
 import torch
 from src.entity_detector import wdv3_timm
 from src.Classes import SpeechBubble, SpeechBubbleType
+from dotenv import load_dotenv
 import google.generativeai as genai
 
 logging.basicConfig(
@@ -43,6 +44,7 @@ logging.basicConfig(
 
 
 class ComicPreprocessor:
+    load_dotenv()
     current_comic: Comic
     export_path: str
     entity_id_counter = 1
@@ -109,7 +111,7 @@ class ComicPreprocessor:
         "For each new narrative arc, output the coordinates (bounding boxes) of the panel that marks the start of the arc. The coordinates should be in the format: (x1, y1, x2, y2) where (x1, y1) is the top-left corner of the panel, and (x2, y2) is the bottom-right corner. You get all panel data as an Input and try to find the most suitable panel bounding box.\n\n"
 
         "Output Format:\n"
-        "{{\n"
+        "{\n"
         "  \"Narrative_Arcs\": [\n"
         "    {{\n"
         "      \"arc_id\": \"1\",\n"
@@ -124,41 +126,42 @@ class ComicPreprocessor:
         "    }}\n"
         "    ...\n"
         "  ]\n"
-        "}}\n\n"
+        "}\n\n"
 
         "Each iteration should update and expand upon the previous narrative arcs. If an arc spans multiple panels, expand on it. If new panels provide clarity or enhance earlier parts of the narrative, update the entire summary to reflect this.\n"
+        "In the description, also state what each person said or did."
         "Also, try to summarize smaller arcs into larger ones for better coherence."
         "Keep in mind that a new arc can only start at the end of the previous arc. Provide the page index in which the arc starts. The page index is always given as an extra input."
         "Also add a confidence which tells how sure you are if an arc is selfstanding."
+        "Each Scene Has to be a minimum of 3 Panels long and cannot be longer than a total of 3 pages. On average, a Scene is 1-2 Pages long."
     )
 
-    def __init__(self, name: str, volume: int, main_series: Series, secondary_series: Optional[List[Series]],
-                 rgb_arrays):
+
+    def __init__(self, name: str,  rgb_arrays,manual_input:bool = False):
         page_pairs = self.convert_array_to_page_pairs(rgb_arrays)
-        self.current_comic = self.convert_images_to_comic(name, volume, main_series, secondary_series, page_pairs)
+        self.current_comic = self.convert_images_to_comic(name, page_pairs)
         self.model = AutoModel.from_pretrained("ragavsachdeva/magiv2", trust_remote_code=True).eval()
         self.tagger = wdv3_timm.Tagger(model_name='vit', gen_threshold=0.35, char_threshold=0.75)
         model_name: str = "gemini-1.5-flash-002"
         self.model_gemini = genai.GenerativeModel(model_name=model_name)
-        genai.configure(api_key="")
+        self.apikey=os.getenv('APIKEY_GEMINI')
+        genai.configure(api_key= self.apikey)
         self.detect_panels()
-        self.describe_narrative()
-        self.match_entities()
+        if not manual_input:
+            self.describe_narrative()
+            self.match_entities()
         self.create_tags()
+        self.entity_noise_reduction_with_overlaps()
         #self.find_clusters()
 
     @staticmethod
-    def convert_images_to_comic(name: str, volume: int, main_series: Series,
-                                secondary_series: Optional[List[Series]], page_pairs):
-        return Comic(name, volume, main_series, secondary_series, page_pairs)
+    def convert_images_to_comic(name: str, page_pairs):
+        return Comic(name, page_pairs)
 
-    def guess_speakers(self):
-        for page_pair in self.current_comic.page_pairs:
-            for page in page_pair:
-                if not page:
-                    continue
-                for panel in page.panels:
-                    t = 2
+    def recalculate_matches(self):
+        self.match_entities()
+        self.create_tags()
+        self.entity_noise_reduction_with_overlaps()
 
     # TODO: refactor loop and use counter
     def convert_array_to_page_pairs(self, rgb_arrays):
@@ -224,11 +227,6 @@ class ComicPreprocessor:
         return description
 
     def describe_narrative(self):
-        """
-        Summarizes the comic pages and integrates the previous narrative context.
-        :param pages: List of comic page objects that contain images.
-        :return: A cumulative summary of the entire comic.
-        """
         overall_summaries = []
         current_summary = ""
         page_counter = 1
@@ -276,19 +274,14 @@ class ComicPreprocessor:
 
                 page_counter += 1
 
-        cleaned_json_string = response.text.strip('```json')
-        cleaned_json_string = cleaned_json_string.strip('```')
-        cleaned_json_string = cleaned_json_string.replace('{{', '{')
-        cleaned_json_string = cleaned_json_string.replace('}}', '}')
-        cleaned_json_string = cleaned_json_string.strip('```')
+        cleaned_json_string = response.text.replace('```json', '').replace('```', '').strip()
         try:
             json_object = json.loads(cleaned_json_string)
         except Exception as e:
             print(e)
-            full_prompt = f"Transform this JSON in valid json that can be used in python: {cleaned_json_string}. Only return the JSON object. this was the error message {e}"
+            full_prompt = f"Transform this JSON in valid json that can be used in python: {cleaned_json_string}. this was the error message {e}. Do not return any explanations. Only return the JSON object."
             response = self.model_gemini.generate_content(full_prompt)
-            cleaned_json_string = response.text.strip('```json')
-            cleaned_json_string = cleaned_json_string.strip('```')
+            cleaned_json_string = response.text.replace('```json', '').replace('```', '').strip()
             print('new generated json: ' + cleaned_json_string)
             try:
                 json_object = json.loads(cleaned_json_string)
@@ -297,8 +290,16 @@ class ComicPreprocessor:
                 print("Error in the scene detection. Please start again or manually select the scenes.")
                 return
 
+
         for arc in json_object['Narrative_Arcs']:
-            page = pages_list[int(arc['starting_page']) - 1]
+            try:
+                start_index = max(0, int(arc['starting_page']) - 1)
+
+                if start_index >= len(pages_list):
+                    start_index = len(pages_list) - 1
+            except (KeyError, ValueError, TypeError) as e:
+                print(f"Invalid starting page: {arc.get('starting_page')}, error: {e}")
+            page = pages_list[start_index]
             bounding_box = arc['coordinates_of_starting_panel']
 
             bounding_box = list(map(float, bounding_box.strip("()").split(", ")))
@@ -331,59 +332,54 @@ class ComicPreprocessor:
 
         panels[nearest_panel_index].starting_tag = True
 
-    def find_names(self):
-        for pages in self.current_comic.page_pairs:
-            for page in pages:
-                if page is None:
-                    continue
-
-                notated_img = page.annotated_image(True, False, True)
 
     def match_entities(self):
         self.current_comic.reset_entities()
         scene_images = self.current_comic.get_scene_images()
+        scene_index = self.current_comic.scenes[0][0].scene_id
         for scene_image, used_pages in scene_images:
-            data = self.detect_objects(scene_image)
-            panel_list = data[0]['panels']
-            speechbubble_list = data[0]['texts']
+            data = self.detect_objects(scene_image,True)
             entity_list = data[0]['characters']
-            tails = data[0]['tails']
-            text_character_associations = data[0]['text_character_associations']
-            text_tail_associations = data[0]['text_tail_associations']
             character_cluster_labels = data[0]['character_cluster_labels']
-            is_essential_text = data[0]['is_essential_text']
-            character_names = data[0]['character_names']
 
             entities_per_page = self.adjust_bounding_boxes(entity_list, used_pages, character_cluster_labels)
 
-            for i,entities in enumerate(entities_per_page):
-                for bbox,cluster_id in entities:
-                    page = used_pages[i]
+            for i, entities in enumerate(entities_per_page):
+                page = used_pages[i]
+
+                for bbox, cluster_id in entities:
                     entity = Entity(bbox)
                     entity.named_entity_id = cluster_id
                     entity.image = iu.image_from_bbox(page.page_image, bbox)
 
+                    best_panel = None
+                    highest_iou = 0
+
                     for panel in page.panels:
-                        best_panel = None
-                        highest_iou = 0
+                        if not panel.scene_id == scene_index:
+                            continue
+                        iou_value = iu.calculate_iou(panel.bounding_box, entity.bounding_box)
+                        if iou_value > highest_iou:
+                            highest_iou = iou_value
+                            best_panel = panel
 
-                        for panel in page.panels:
-                            iou_value = iu.calculate_iou(panel.bounding_box, entity.bounding_box)
+                    if best_panel is not None and highest_iou > 0:
+                        if not any(iu.calculate_iou(existing_entity.bounding_box, entity.bounding_box) > 0.7
+                                   for existing_entity in best_panel.entities):
+                            best_panel.entities.append(entity)
+                for panel in page.panels:
+                    panel.entities = sorted(panel.entities, key=lambda p: (p.bounding_box['y'], p.bounding_box['x']))
 
-                            if iou_value > highest_iou:
-                                highest_iou = iou_value
-                                best_panel = panel
+            unique_cluster_ids = sorted(set(
+                entity.named_entity_id for panel in self.current_comic.scenes[scene_index] for entity in panel.entities))
 
-                        if best_panel is not None and highest_iou > 0:
-                            if not any(iu.calculate_iou(existing_entity.bounding_box, entity.bounding_box) > 0.7
-                                       for existing_entity in best_panel.entities):
-                                best_panel.entities.append(entity)
+            cluster_id_mapping = {old_id: new_id for new_id, old_id in enumerate(unique_cluster_ids)}
 
-                        for panel in page.panels:
-                            entities = panel.entities
-                            panel.entities = sorted(entities,
-                                                    key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height']),
-                                                                   (p.bounding_box['x']) - p.bounding_box['width']))
+            for panel in self.current_comic.scenes[scene_index]:
+                for entity in panel.entities:
+                    entity.named_entity_id = cluster_id_mapping[entity.named_entity_id]
+
+            scene_index += 1
 
     def adjust_bounding_boxes(self, bounding_boxes, scene_pages, character_cluster_labels):
         page_offsets = []
@@ -444,7 +440,6 @@ class ComicPreprocessor:
 
             entity_tag_str = "List of Entities: \n"
 
-    # TODO find way for threading
     def create_tags(self):
         threads = []
 
@@ -457,7 +452,6 @@ class ComicPreprocessor:
                 self.handle_create_tags(page)
             logging.debug('\n')
 
-    #Use local model
     def handle_create_tags(self, page):
 
         for panel in page.panels:
@@ -476,9 +470,10 @@ class ComicPreprocessor:
                 # TODO: add to .env as name
                 os.remove('tmp.jpg')
                 if not self.is_character(entity.tags):
-                    panel.entities.remove(entity)
+                    entity.active_tag = False
+                    #panel.entities.remove(entity)
 
-    def is_character(self, tag_confidence_tuples, threshold=0.7) -> bool:
+    def is_character(self, tag_confidence_tuples, threshold=0.5) -> bool:
         # Filter tags based on the threshold
         valid_tags = {tag: score for tag, score in tag_confidence_tuples if score >= threshold}
 
@@ -494,6 +489,89 @@ class ComicPreprocessor:
 
         # If we have valid tags, and none of the conditions return False, we return True (it's a character)
         return len(valid_tags) > 0
+
+    def calculate_all_overlaps(self, panel,threshold=0.8):
+        overlaps = {}
+        for i, entity_a in enumerate(panel.entities):
+            overlaps[entity_a] = []
+
+            for j, entity_b in enumerate(panel.entities):
+                if i == j:
+                    continue
+
+                overlap_percentage = iu.calculate_overlap_percentage(entity_a.bounding_box, entity_b.bounding_box)
+
+                if overlap_percentage > threshold:
+                    overlaps[entity_a].append((entity_b, overlap_percentage))
+
+        return overlaps
+
+    def entity_noise_reduction_with_overlaps(self, threshold=0.8):
+        for pages in self.current_comic.page_pairs:
+            for page in pages:
+                if page is None:
+                    continue
+
+                for panel in page.panels:
+                    entities_with_scores = []
+
+                    # Collect entities and their top tag scores, ignoring inactive entities
+                    for entity in panel.entities:
+                        if not entity.active_tag:
+                            continue
+
+                        # Calculate the top tag score sum for the entity
+                        entity_top_tags = sorted(entity.tags, key=lambda x: x[1], reverse=True)[:3]
+                        entity_top_tag_sum = sum(tag[1] for tag in entity_top_tags)
+                        entities_with_scores.append((entity, entity_top_tag_sum))
+
+                    # Sort entities by score in descending order for processing
+                    entities_with_scores.sort(key=lambda x: x[1], reverse=True)
+
+                    overlap_groups = []
+                    processed = set()
+
+                    # Compare all entities against each other
+                    for i, (entity, entity_score) in enumerate(entities_with_scores):
+                        if entity in processed:
+                            continue
+
+                        # Create a new group for this entity
+                        group = [(entity, entity_score)]
+                        processed.add(entity)
+
+                        # Compare with all other entities, both before and after
+                        for j in range(len(entities_with_scores)):
+                            if i == j or entities_with_scores[j][0] in processed:
+                                continue
+
+                            overlap_entity, overlap_score = entities_with_scores[j]
+
+                            # Calculate overlap percentage
+                            overlap_percentage = iu.calculate_overlap_percentage(
+                                entity.bounding_box, overlap_entity.bounding_box
+                            )
+                            print(overlap_percentage)
+                            if overlap_percentage > threshold:
+                                group.append((overlap_entity, overlap_score))
+                                processed.add(overlap_entity)
+
+                        # Add the group to the list of overlap groups
+                        overlap_groups.append(group)
+
+                    # Activate only the highest-scoring entity in each group
+                    for group in overlap_groups:
+                        group.sort(key=lambda x: x[1], reverse=True)
+                        highest_entity, highest_score = group[0]
+                        highest_entity.active_tag = True
+
+                        # Deactivate all other entities in the group
+                        for entity, score in group[1:]:
+                            entity.active_tag = False
+
+                    # Debug: Print active/inactive states for verification
+                    for entity in panel.entities:
+                        print(f"Entity {entity}: Active -> {entity.active_tag}")
 
     #TODO: Refactor with extract_speech_bubbles
     def detect_panels(self):
@@ -544,9 +622,12 @@ class ComicPreprocessor:
             panel.descriptions.append(panel.description)
             panels.append(panel)
 
-        panels = sorted(panels, key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height']),
-                                               (p.bounding_box['x']) - p.bounding_box['width']))
-        page.panels = panels
+        y_tolerance = 50
+        sorted_panels = sorted(
+            panels,
+            key=lambda p: (p.bounding_box['y'] // y_tolerance, p.bounding_box['x'])
+        )
+        page.panels = sorted_panels
 
         for i, entity_ in enumerate(entity_list):
             bbox = self.x1y1x2y2_to_xywh(entity_)
@@ -566,7 +647,7 @@ class ComicPreprocessor:
                         best_panel = panel
 
                 if best_panel is not None and highest_iou > 0:
-                    if not any(iu.calculate_iou(existing_entity.bounding_box, entity.bounding_box) > 0.7
+                    if not any(iu.calculate_iou(existing_entity.bounding_box, entity.bounding_box) > 0.6
                                for existing_entity in best_panel.entities):
                         best_panel.entities.append(entity)
 
@@ -584,25 +665,33 @@ class ComicPreprocessor:
             speech_bubble = SpeechBubble(SpeechBubbleType.SPEECH, description, bbox, speech_bubble_image)
             speech_bubble.type = 'dialogue'
             speech_bubble.person_list = []
-            #TODO: Use classification of speech bubble for this
+
             if is_essential_text[i]:
-                #speech_bubble.speaker_id = character_cluster_labels[text_character_associations[essential_counter][1]]
-                essential_counter += 1
                 speech_bubble.speaker_id = 1
-                #else:
+                essential_counter += 1
+            else:
                 speech_bubble.speaker_id = 0
 
+            max_overlap = 0
+            best_panel = None
             for panel in page.panels:
-                if iu.is_bbox_overlapping(panel.bounding_box, speech_bubble.bounding_box):
-                    panel.speech_bubbles.append(speech_bubble)
+                overlap = iu.calculate_overlap_percentage(speech_bubble.bounding_box, panel.bounding_box)
+                if overlap > max_overlap:
+                    max_overlap = overlap
+                    best_panel = panel
 
-                for panel in page.panels:
-                    speech_bubbles = panel.speech_bubbles
-                    panel.speech_bubbles = sorted(speech_bubbles,
-                                                  key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height']),
-                                                                 (p.bounding_box['x']) - p.bounding_box['width']))
+            if best_panel:
+                best_panel.speech_bubbles.append(speech_bubble)
 
-    def detect_objects(self, image):
+        for panel in page.panels:
+            speech_bubbles = panel.speech_bubbles
+            panel.speech_bubbles = sorted(
+                speech_bubbles,
+                key=lambda p: ((p.bounding_box['y'] - p.bounding_box['height']),
+                               (p.bounding_box['x'] - p.bounding_box['width']))
+            )
+
+    def detect_objects(self, image,debug=False):
         images = []
         images.append(image)
         character_bank = {
@@ -613,8 +702,9 @@ class ComicPreprocessor:
             page_results = self.model.do_chapter_wide_prediction(images, character_bank, use_tqdm=True,
                                                                  do_ocr=False)
             print(page_results)
-            #for i, (image, page_result) in enumerate(zip(image, page_results)):
-            #self.model.visualise_single_image_prediction(image, page_result, f"page_{random.randint(0, 10000)}.png")
+            if(debug):
+                for i, (image, page_result) in enumerate(zip(image, page_results)):
+                    self.model.visualise_single_image_prediction(image, page_result, f"page_{random.randint(0, 10000)}.png")
 
         return page_results
 

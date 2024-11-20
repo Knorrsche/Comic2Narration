@@ -19,12 +19,8 @@ import cv2
 
 
 class Comic:
-    def __init__(self, name: str, volume: int, main_series: Series, secondary_series: Optional['List[Series]'],
-                 page_pairs: List[tuple[Optional[Page], Optional[Page]]]):
+    def __init__(self, name: str,page_pairs: List[tuple[Optional[Page], Optional[Page]]]):
         self.name = name
-        self.volume = volume
-        self.main_series = main_series
-        self.secondary_series = secondary_series
         self.page_pairs = page_pairs
         self.scenes = []
         self.scene_data = ''
@@ -32,38 +28,18 @@ class Comic:
     def to_narrative(self) -> str:
         script = ''
         white_spaces = '     '
-
-        for page_pair in self.page_pairs:
-
-            for page in page_pair:
-                if page is None:
-                    continue
-                script += f'\nPage: {page.page_index}\n'
-                panel_counter = 1
-
-                for panel in page.panels:
-                    script += f'\n{white_spaces}Panel {panel_counter}: {panel.description}\n'
-                    panel_counter += 1
-                    speech_bubble_counter = 1
-
-                    for speech_bubble in panel.speech_bubbles:
-                        script += f'\n{white_spaces * 2}Speech Bubble {speech_bubble_counter}: {speech_bubble.text}\n'
-                        speech_bubble_counter += 1
+        for i,scene in enumerate(self.scenes):
+            script +=  f'Scene {i+1} \n'
+            for j,panel in enumerate(scene):
+                script += white_spaces + f'Panel {j+1}: {panel.description}\n'
+                for speechbubble in panel.speech_bubbles:
+                    script += white_spaces * 2 + speechbubble.get_string() + '\n'
         return script
 
     # TODO: create series object
     def to_xml(self):
         element = eT.Element('Comic')
         eT.SubElement(element, 'Name').text = self.name
-        eT.SubElement(element, 'Volume').text = str(self.volume)
-        # ET.SubElement(element, 'MainSeries').text = self.main_series.name
-        eT.SubElement(element, 'MainSeries').text = 'MainSeries'
-
-        secondary_series_element = eT.SubElement(element, 'SecondarySeries')
-        # for series in self.secondary_series:
-        series_name_element = eT.SubElement(secondary_series_element, 'Series')
-        # ET.SubElement(series_name_element, 'Name').text = series.name
-        eT.SubElement(series_name_element, 'Name').text = 'SecondarySeries'
 
         page_pairs_element = eT.SubElement(element, 'PagePairs')
         for pair in self.page_pairs:
@@ -117,49 +93,6 @@ class Comic:
             for panel in scene:
                 panel.entities.clear()
 
-    def resize_image(self,image, target_size):
-        return cv2.resize(image, (target_size, target_size))
-
-    def enhanced_matching(self, save_path="output_entities"):
-        os.makedirs(save_path, exist_ok=True)  # Create the output directory if it doesn't exist
-
-        for scene_idx, scene in enumerate(self.scenes):
-            # Gather all entity images from each panel in the current scene
-            entity_images = [entity.image for panel in scene for entity in panel.entities]
-            num_entities = len(entity_images)
-
-            if num_entities == 0:
-                print(f"No entities found in scene {scene_idx + 1}")
-                continue
-
-            # Determine grid size based on the number of entities
-            grid_cols = math.ceil(math.sqrt(num_entities))  # Number of columns in the grid
-            grid_rows = math.ceil(num_entities / grid_cols)  # Number of rows in the grid
-
-            # Determine maximum width and height of entity images to create a consistent grid
-            max_entity_height = max(entity.shape[0] for entity in entity_images)
-            max_entity_width = max(entity.shape[1] for entity in entity_images)
-
-            # Create a canvas for arranging entity images in a grid format
-            canvas_height = grid_rows * max_entity_height
-            canvas_width = grid_cols * max_entity_width
-            canvas = np.zeros((canvas_height, canvas_width, 3), dtype=entity_images[0].dtype)
-
-            # Place each entity image onto the canvas
-            for idx, entity_img in enumerate(entity_images):
-                row = idx // grid_cols
-                col = idx % grid_cols
-                y_offset = row * max_entity_height
-                x_offset = col * max_entity_width
-
-                # Add the entity image to the canvas at the calculated position
-                canvas[y_offset:y_offset + entity_img.shape[0], x_offset:x_offset + entity_img.shape[1]] = entity_img
-
-            # Save the combined image for this scene's entities
-            file_path = f"{save_path}/scene_{scene_idx + 1}_entities.jpg"
-            cv2.imwrite(file_path, canvas)
-            print(f"Combined entity image saved at: {file_path}")
-
     def get_scene_images(self):
         comic_pages = []
         scene_images = []
@@ -188,15 +121,13 @@ class Comic:
                 try:
                     scene_image = np.hstack(scene_pages)
                     scene_images.append((scene_image,used_pages))
-                    #cv2.imwrite(f'scene_{idx}.png', scene_image)
+                    cv2.imwrite(f'scene_{idx}.png', scene_image)
                 except ValueError as e:
                     print(f"Error stacking images for scene {idx}: {e}")
         return scene_images
 
-
-
-
     #TODO: Add temp saving of word2vec to not need to recalculate every time
+    #TODO: put outside
     def match_entities(self, clusters_list, algorithm='Birch', input_type='One-Hot Encoding', confidence=0.1,
                        debug=False):
         """
@@ -321,7 +252,6 @@ class Comic:
 
 
 
-    #TODO: Find better algorithm to identify wrongly classified images
     def update_entities(self, entity_confidence_minimum):
         for scene in self.scenes:
             for panel in scene:
@@ -330,7 +260,6 @@ class Comic:
                     entity.active_tag = has_active_tag
 
 
-    #TODO can be more efficent
     def update_scenes(self):
         scene_counter = 0
         scenes = []

@@ -21,9 +21,9 @@ class Application:
 
         self.file_input_screen.frame.pack(padx=20, pady=20)
 
-    def show_comic_display_screen(self, comic,comic_preprocessor: ComicPreprocessor, filepath: str,):
+    def show_comic_display_screen(self, comic, file_path: str,comic_preprocessor: ComicPreprocessor = None,):
         self.file_input_screen.frame.pack_forget()
-        self.comic_display_screen = ComicDisplayPage(self, comic, comic_preprocessor,filepath)
+        self.comic_display_screen = ComicDisplayPage(self, comic=comic, comic_preprocessor=comic_preprocessor,file_path=file_path)
 
 
 def main():

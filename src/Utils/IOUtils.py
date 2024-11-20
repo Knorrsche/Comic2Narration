@@ -17,7 +17,7 @@ from src.Utils.ImageUtils import image_from_bbox
 
 def escape_text(text, reverse=False):
     if text is None: return text
-    
+
     text = text.encode('utf-8').decode('utf-8')
 
     escaped_text = saxutils.escape(text)
@@ -25,7 +25,7 @@ def escape_text(text, reverse=False):
     xml_friendly_text = escaped_text.replace('\n', ' ')
 
     special_chars = {
-        '&':'&amp;',
+        '&': '&amp;',
         '©': '&copy;',
         '®': '&reg;',
         '™': '&trade;',
@@ -74,7 +74,6 @@ def prettify_xml(element):
     return reparsed.toprettyxml(indent="  ")
 
 
-# TODO: make universal export and import functions
 def save_xml_to_file(filepath, xml_str):
     with open(filepath, 'w') as file:
         file.write(xml_str)
@@ -148,7 +147,7 @@ def parse_bounding_box(bbox_str):
 
 def parse_speech_bubble(sb_elem):
     speech_bubble = SpeechBubble(
-        type=SpeechBubbleType[sb_elem.find('Type').text.upper()],
+        type=sb_elem.find('Type').text,
         text=escape_text(sb_elem.find('Text').text, reverse=True),
         bounding_box=parse_bounding_box(sb_elem.find('BoundingBox').text)
     )
@@ -165,6 +164,7 @@ def parase_entities(en_elem):
     entity.starting_tag = str_to_bool(en_elem.find('Active_Tag').text)
     return entity
 
+
 def parse_tags(en_elem):
     tags = en_elem.findall('Tag')
     tag_list = []
@@ -175,6 +175,7 @@ def parse_tags(en_elem):
         tag_list.append((label, value))
 
     return tag_list
+
 
 def parse_panel(panel_elem):
     speech_bubbles = [parse_speech_bubble(sb) for sb in panel_elem.find('SpeechBubbles')]
@@ -205,24 +206,14 @@ def parse_page_pair(page_pair_elem):
     return left_page, right_page
 
 
-def parse_series(series_elem):
-    name_elem = series_elem.find('Name')
-    if name_elem is not None:
-        return Series(name=name_elem.text)
-    else:
-        return Series(name='')
-
-
 # TODO: add image data
 def parse_comic(xml_content):
     root = eT.fromstring(xml_content)
     name = root.find('Name').text
-    volume = root.find('Volume').text
-    main_series = parse_series(root.find('MainSeries'))
-    secondary_series = [parse_series(series) for series in root.find('SecondarySeries')]
     page_pairs = [parse_page_pair(pp) for pp in root.find('PagePairs')]
 
-    return Comic(name, volume, main_series, secondary_series, page_pairs)
+    return Comic(name, page_pairs)
+
 def str_to_bool(s):
     if isinstance(s, str):
         s = s.strip().lower()
@@ -232,6 +223,8 @@ def str_to_bool(s):
             return False
     raise ValueError(f"Cannot convert {s} to boolean")
 
+
+#TODO: add Taggs again?
 def add_image_data(comic: Comic, file_path: str):
     pages = convert_pdf_to_image(file_path)
     counter = 0
@@ -261,4 +254,3 @@ def add_image_data(comic: Comic, file_path: str):
                 for entity in panel.entities:
                     entity.image = image_from_bbox(right_page.page_image, entity.bounding_box)
             counter += 1
-

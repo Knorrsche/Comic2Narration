@@ -33,20 +33,13 @@ class FileInputPage:
         self.name_entry = tk.Entry(self.frame, width=50)
         self.name_entry.pack(pady=5)
 
-        self.volume_label = tk.Label(self.frame, text="Volume:")
-        self.volume_label.pack(pady=5)
-        self.volume_entry = tk.Entry(self.frame, width=50)
-        self.volume_entry.pack(pady=5)
-
-        self.main_series_label = tk.Label(self.frame, text="Main Series:")
-        self.main_series_label.pack(pady=5)
-        self.main_series_entry = tk.Entry(self.frame, width=50)
-        self.main_series_entry.pack(pady=5)
-
-        self.secondary_series_label = tk.Label(self.frame, text="Secondary Series:")
-        self.secondary_series_label.pack(pady=5)
-        self.secondary_series_entry = tk.Entry(self.frame, width=50)
-        self.secondary_series_entry.pack(pady=5)
+        self.manual_input = False
+        self.manual_input_checkbox = tk.Checkbutton(
+            self.frame,
+            text="Manual Input",
+            command=self.toggle_manual_input
+        )
+        self.manual_input_checkbox.pack(pady=10)
 
         self.next_button = tk.Button(self.frame, text="Next", command=self.handle_next)
         self.next_button.pack(pady=10)
@@ -54,14 +47,8 @@ class FileInputPage:
         self.import_button = tk.Button(self.frame, text="Import", command=self.import_comic)
         self.import_button.pack(pady=10)
 
-        self.talk_button = tk.Button(self.frame, text="Talk", command=self.talk)
-        self.talk_button.pack(pady=10)
-
-    @staticmethod
-    def talk():
-        engine = pyttsx3.init()
-        engine.say("Hello guys today i am talking and how are you all doing this is a story about spiderman")
-        engine.runAndWait()
+    def toggle_manual_input(self):
+        self.manual_input = not self.manual_input
 
     def browse_file(self):
         filename = filedialog.askopenfilename(parent=self.parent.root, title='Browse File',
@@ -74,20 +61,13 @@ class FileInputPage:
     def handle_next(self):
         file_path = self.file_entry.get()
         name = self.name_entry.get()
-        volume = self.volume_entry.get()
-        main_series = Series(name=self.main_series_entry.get())
-        secondary_series = [self.secondary_series_entry.get()]
-
-        if not (file_path and name and volume and main_series.name):
-            messagebox.showerror("Error", "Please fill in all fields (Secondary Series is Optional).")
-            return
 
         messagebox.showinfo("Info", "The Comic PDF is now being read. This may take a few minutes. Please wait.")
 
         rgb_arrays = convert_pdf_to_image(file_path)
-        self.comic_preprocessor = ComicPreprocessor(name, volume, main_series, secondary_series, rgb_arrays)
+        self.comic_preprocessor = ComicPreprocessor(name, rgb_arrays,self.manual_input)
         self.speech_bubble_extractor = SpeechBubbleExtractor(self.comic_preprocessor.current_comic,self.comic_preprocessor)
-        self.parent.show_comic_display_screen(self.speech_bubble_extractor.current_comic, self.comic_preprocessor,file_path,)
+        self.parent.show_comic_display_screen(comic=self.speech_bubble_extractor.current_comic, comic_preprocessor=self.comic_preprocessor,file_path=file_path)
 
     def import_comic(self):
         self.browse_file()

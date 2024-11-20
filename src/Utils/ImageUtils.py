@@ -22,33 +22,58 @@ def draw_bounding_box(image, bbox, color, thickness=2, number=None, type=None):
     font_thickness = 1
     font = cv2.FONT_HERSHEY_SIMPLEX
 
-    def draw_text_with_background(image,text, x, y):
+    def draw_text_with_background(image, text, x, y):
         text_size = cv2.getTextSize(text, font, font_scale, font_thickness)[0]
         text_w, text_h = text_size
 
-        background_rect_x1 = x - 2
+        centered_x = x - text_w // 2
+        background_rect_x1 = centered_x - 2
         background_rect_y1 = y - text_h - 2
-        background_rect_x2 = x + text_w + 2
+        background_rect_x2 = centered_x + text_w + 2
         background_rect_y2 = y + 2
 
         image = cv2.rectangle(image, (background_rect_x1, background_rect_y1), (background_rect_x2, background_rect_y2),
                               (255, 255, 255), -1)
-        image = cv2.putText(image, text, (x, y), font, font_scale, color, font_thickness, cv2.LINE_AA)
+        image = cv2.putText(image, text, (centered_x, y), font, font_scale, color, font_thickness, cv2.LINE_AA)
 
         return image
 
     if number is not None:
-        text_x_n = x + w - 20
-        text_y_n = y + h - 5
-        image = draw_text_with_background(image,str(number), text_x_n, text_y_n)
+        text_x_n = x + w // 2
+        text_y_n = y + h - 10
+        image = draw_text_with_background(image, str(number), text_x_n, text_y_n)
 
     if type is not None:
-        text_x_t = x + w - 20
-        text_y_t = y + 15
-        image = draw_text_with_background(image,type, text_x_t, text_y_t)
+        text_x_t = x + w // 2
+        text_y_t = y + h - 30
+        image = draw_text_with_background(image, type, text_x_t, text_y_t)
 
     return image
+def calculate_overlap_percentage(box_a, box_b):
+        x_min_a = box_a['x']
+        y_min_a = box_a['y']
+        x_max_a = box_a['x']+box_a['width']
+        y_max_a = box_a['y']+box_a['height']
 
+        x_min_b = box_b['x']
+        y_min_b = box_b['y']
+        x_max_b = box_b['x']+box_b['width']
+        y_max_b = box_b['y']+box_b['height']
+
+        x_min_inter = max(x_min_a, x_min_b)
+        y_min_inter = max(y_min_a, y_min_b)
+        x_max_inter = min(x_max_a, x_max_b)
+        y_max_inter = min(y_max_a, y_max_b)
+
+        if x_min_inter < x_max_inter and y_min_inter < y_max_inter:
+            intersection_area = (x_max_inter - x_min_inter) * (y_max_inter - y_min_inter)
+
+            area_a = (x_max_a - x_min_a) * (y_max_a - y_min_a)
+
+            overlap_percentage = (intersection_area / area_a)
+            return overlap_percentage
+        else:
+            return 0.0
 
 def calculate_iou(bbox1, bbox2):
     x1_start = bbox1['x']

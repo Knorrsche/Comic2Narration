@@ -1,5 +1,8 @@
+import tempfile
 import tkinter as tk
 from tkinter import filedialog, messagebox
+
+import cv2
 import numpy as np
 from PIL import Image, ImageTk
 from Classes import Page
@@ -9,10 +12,152 @@ import tkinter.font as fnt
 import pygame
 import pyttsx3
 import os
-
+import google.generativeai as genai
 
 class ComicDisplayPage:
-    def __init__(self, parent, comic, comic_preprocessor,filepath):
+    comic_panel_prompt = """
+      Given a list of comic panels, including descriptions, previous context (with assumed speakers, their dialogue, and character profiles), and text extracted from speech bubbles, summarize the events happening in each panel. For each panel, identify the most likely speaker for each speech bubble by considering existing character profiles or inferring from context. Establish a connection between each panel and the previous panels to create a coherent narrative. Finally, create or update character profiles based on their actions and dialogue across the panels.
+
+      Additional Informations:
+      -If a name appears in a text, its very unlikely that its the name of the speaker, but more likely that its the name of a conversation partner.
+      -Try to find aliases, If for example Peter, Peter Parker and Pete exists, they are most likely the same person.
+      -You are allowed to change previous informations if you gained new insights about speaker prediction.
+
+      Provide the output in the following JSON format:
+
+      {
+        "panels": [
+          {
+            "panel_number": 1,
+            "summary": "A brief description of the panel's events.",
+            "dialogue": [
+              {
+                "speechbubble_id": "Index of the speechbubble",
+                "text": "The exact speech bubble text.",
+                "type": "Type of text. For example: Speech, Inner Monologue."
+                "predicted_speaker": "The predicted speaker based on context."
+              }
+            ],
+            "connection_to_previous_panel": "Explanation of how this panel connects to the prior panels."
+          },
+          ...
+        ],
+        "character_profiles": {
+          "Character Name": {
+            "description": "A description of the character based on their role and actions.",
+            "notable_traits": "Key traits, motivations, or patterns observed in their behavior.",
+            "relationships": "Details on how this character relates to others in the story."
+          },
+          ...
+        }
+      }
+
+      ### Example Input:
+      #### Previous Context:
+    {
+        "panels": [
+          {
+            "panel_number": 1,
+            "summary": "A superhero flies over a city at night with a glowing object as civilians look on in awe. A villain observes from a rooftop, smirking confidently. The superhero is clearly pursuing the villain after a theft.",
+            "dialogue": [
+              {
+                "speechbubble_id": "1",
+                "text": "You'll never get away with this!",
+                "type": "Speech",
+                "predicted_speaker": "Superhero"
+              },
+              {
+                "speechbubble_id": "2",
+                "text": "Oh, but I already have!",
+                "type": "Speech",
+                "predicted_speaker": "Villain"
+              }
+            ],
+            "connection_to_previous_panel": "This panel establishes the ongoing chase between the superhero and the villain."
+          }
+        ],
+        "character_profiles": {
+          "Superhero": {
+            "description": "A determined and morally upright individual dedicated to stopping the villain.",
+            "notable_traits": "Courageous, relentless in pursuit, motivated by justice.",
+            "relationships": "The primary adversary of the Villain."
+          },
+          "Villain": {
+            "description": "A cunning and confident thief who wields a stolen artifact of great power.",
+            "notable_traits": "Clever, arrogant, resourceful.",
+            "relationships": "The main opponent of the Superhero, taunts them frequently."
+          }
+        }
+      }
+
+      #### Panel Description:
+      The superhero lands on the rooftop to confront the villain. The villain draws a weapon, glowing with the same energy as the stolen artifact.
+
+      #### Speech Bubble Texts:
+      "Panel Number: 2"
+      "Speechbubble Data:"
+      "Speechbubble Index: 1 Text: This ends now!"
+      "Speechbubble Index: 2 Text: Not if I end you first!"
+
+      ### Example Output:
+      {
+        "panels": [
+          {
+            "panel_number": 1,
+            "summary": "A superhero flies over a city at night with a glowing object as civilians look on in awe. A villain observes from a rooftop, smirking confidently. The superhero is clearly pursuing the villain after a theft.",
+            "dialogue": [
+              {
+                "speechbubble_id": "1",
+                "text": "You'll never get away with this!",
+                "type": "Speech",
+                "predicted_speaker": "Superhero"
+              },
+              {
+                "speechbubble_id": "2",
+                "text": "Oh, but I already have!",
+                "type": "Speech",
+                "predicted_speaker": "Villain"
+              }
+            ],
+            "connection_to_previous_panel": "This panel establishes the ongoing chase between the superhero and the villain."
+          },
+          {
+            "panel_number": 2,
+            "summary": "The superhero confronts the villain on the rooftop, ready for a fight. The villain reveals a weapon powered by the stolen artifact.",
+            "dialogue": [
+              {
+                "speechbubble_id": "1",
+                "text": "This ends now!",
+                "type": "Speech",
+                "predicted_speaker": "Superhero"
+              },
+              {
+                "speechbubble_id": "2",
+                "text": "Not if I end you first!",
+                "type": "Speech",
+                "predicted_speaker": "Villain"
+              }
+            ],
+            "connection_to_previous_panel": "The confrontation follows the chase established in the first panel. The villain shows they are armed with the stolen artifact's power."
+          }
+        ],
+        "character_profiles": {
+          "Superhero": {
+            "description": "A determined and morally upright individual dedicated to stopping the villain.",
+            "notable_traits": "Courageous, relentless in pursuit, motivated by justice.",
+            "relationships": "The primary adversary of the Villain."
+          },
+          "Villain": {
+            "description": "A cunning and confident thief who wields a stolen artifact of great power.",
+            "notable_traits": "Clever, arrogant, resourceful.",
+            "relationships": "The main opponent of the Superhero, taunts them frequently."
+          }
+        }
+      }
+
+      Now, process the following input:
+      """
+    def __init__(self, parent, comic, comic_preprocessor,file_path:str):
         self.comic_preprocessor = comic_preprocessor
         self.parent = parent
         self.comic = comic
@@ -22,8 +167,9 @@ class ComicDisplayPage:
         self.show_speech_bubbles = True
         self.show_panels = True
         self.show_entities = True
+        self.show_deactivated_entities = False
         self.show_text = False
-        self.import_path = filepath
+        self.import_path = file_path
         self.confidence_limit = 0.1
         self.entity_min_confidence = 0.9
 
@@ -81,6 +227,7 @@ class ComicDisplayPage:
         display_menu.add_command(label="Toggle Panels", command=self.toggle_panels)
         display_menu.add_command(label="Toggle Speech Bubbles", command=self.toggle_speech_bubbles)
         display_menu.add_command(label="Toggle Entities", command=self.toggle_entities)
+        display_menu.add_command(label="Toggle Deactivated Entities", command=self.toggle_deactivated_entities)
         display_menu.add_command(label="Toggle Text",command=self.toggle_text)
 
     def display_images(self):
@@ -94,10 +241,12 @@ class ComicDisplayPage:
 
         left_image_array = left_page.annotated_image(self.show_panels,
                                                      self.show_speech_bubbles,
-                                                     self.show_entities) if left_page is not None else self.create_blank_image()
+                                                     self.show_entities,
+                                                     self.show_deactivated_entities) if left_page is not None else self.create_blank_image()
         right_image_array = right_page.annotated_image(self.show_panels,
                                                        self.show_speech_bubbles,
-                                                       self.show_entities) if right_page is not None else self.create_blank_image()
+                                                       self.show_entities,
+                                                       self.show_deactivated_entities) if right_page is not None else self.create_blank_image()
 
         self.left_image = Image.fromarray(left_image_array)
         self.right_image = Image.fromarray(right_image_array)
@@ -174,6 +323,10 @@ class ComicDisplayPage:
 
     def toggle_entities(self):
         self.show_entities = not self.show_entities
+        self.display_images()
+
+    def toggle_deactivated_entities(self):
+        self.show_deactivated_entities = not self.show_deactivated_entities
         self.display_images()
 
     def toggle_text(self):
@@ -274,15 +427,26 @@ class ComicDisplayPage:
                 entry.pack(pady=5)
                 self.entity_entries.append(entry)
 
-        predict_button = tk.Button(input_window, text="Predict Cluster Size",
-                                   command=self.comic_preprocessor.match_entities())
-        predict_button.pack(pady=10)
-
         confidence_label = tk.Label(input_window, text="Enter Confidence Limit (0-1):")
         confidence_label.pack(pady=10)
         confidence_entry = tk.Entry(input_window)
         confidence_entry.pack(pady=5)
         confidence_entry.insert(0, self.confidence_limit)
+
+        #auto_match_button = tk.Button(
+        #    input_window,
+        #    text="Automatically Match Entities",
+        #    command=self.comic_preprocessor.recalculate_matches
+        #)
+        #auto_match_button.pack(pady=10)
+
+        speaker_association_button = tk.Button(
+            input_window,
+            text="Apply Speaker Association",
+            command=self.speaker_association
+        )
+        speaker_association_button.pack(pady=10)
+
 
         algorithm_label = tk.Label(input_window, text="Select Clustering Algorithm:")
         algorithm_label.pack(pady=10)
@@ -420,6 +584,11 @@ class ComicDisplayPage:
 
             if self.show_entities:
                 for entity in panel.entities:
+                    if not entity.active_tag and not self.show_panels:
+                        continue
+                    color = "blue"
+                    if entity.active_tag:
+                        color = "purple"
                     bbox = entity.bounding_box
 
                     center_x = bbox['x'] * width_scale
@@ -430,7 +599,7 @@ class ComicDisplayPage:
 
                     button = tk.Button(
                         frame,
-                        bg="blue",
+                        bg=color,
                         text='entity',
                         font=fnt.Font(size=6),
                         borderwidth=0,
@@ -553,3 +722,42 @@ class ComicDisplayPage:
 
         close_button = tk.Button(tags_window, text="Close", command=tags_window.destroy)
         close_button.pack(pady=10)
+
+    #TODO: outsorce
+    def speaker_association(self):
+        model_name: str = "gemini-1.5-flash-002"
+        self.model_gemini = genai.GenerativeModel(model_name=model_name)
+        self.apikey="AIzaSyC4wIpv9pXO8QT6lnQVQht8_Ldy0rbTuTg"
+        genai.configure(api_key= self.apikey)
+        for scene in self.comic.scenes:
+            current_summary = ""
+            for i, panel in enumerate(scene):
+                image_rgb = cv2.cvtColor(panel.image, cv2.COLOR_BGR2RGB)
+
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
+                    temp_filename = tmp_file.name
+                    cv2.imwrite(temp_filename, image_rgb)
+
+                sample_file = genai.upload_file(path=temp_filename,
+                                                display_name="Comic Panel")
+
+                panel_information = 'Current Panel Data: \n'
+                panel_information = panel_information + f'Panel Number: + {i + 1} \n Speechbubble Data: \n'
+                speechbubbles = panel.speech_bubbles
+
+                for i, speechbubble in enumerate(speechbubbles):
+                    panel_information = panel_information + f'Speechbubble Index: + {i + 1}  Text: {speechbubble.text} \n'
+
+                previous_summary_text = f"\n\nPrevious Narrative Summary:\n{current_summary}" if current_summary else ""
+                full_prompt = self.comic_panel_prompt + '\n' + previous_summary_text + '\n' + panel_information
+
+                try:
+                    response = self.model_gemini.generate_content([sample_file, full_prompt])
+                except Exception as e:
+                    print(e)
+
+                description = response.text
+
+                current_summary += description + "\n"
+
+                print(f"Panel {i + 1} Speaker:\n{description}\n")
