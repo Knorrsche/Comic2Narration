@@ -727,7 +727,7 @@ class ComicDisplayPage:
     def speaker_association(self):
         model_name: str = "gemini-1.5-flash-002"
         self.model_gemini = genai.GenerativeModel(model_name=model_name)
-        self.apikey="AIzaSyC4wIpv9pXO8QT6lnQVQht8_Ldy0rbTuTg"
+        self.apikey=os.getenv('APIKEY_GEMINI')
         genai.configure(api_key= self.apikey)
         for scene in self.comic.scenes:
             current_summary = ""
